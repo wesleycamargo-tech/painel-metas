@@ -122,39 +122,38 @@ else:
 # ==============================================================================
 st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
 
-# Lista completa de indicadores que ficarão fixos nas linhas
+# Lista completa de indicadores revisada e limpa fixada nas linhas
 indicadores_linhas = [
-    "💻 CSAT Geral / Canais",
-    "⏱️ TMA / TMT (Tempo Médio)",
+    "💻 CSAT",
+    "⏱️ TMA / TMT",
     "🚫 Improcedência Devida",
-    "🎧 Nota de Monitoria (Base)",
-    "🎧 Nota de Monitoria (Q1)",
+    "🎧 Nota de Monitoria",
     "📅 Aderência à Escala",
     "🛑 Evasão de Pausas",
-    "🧠 Treinamento Regulamentar"
+    "🧠 Treinamento"
 ]
 
 # Construindo o dicionário com tuplas para criar as subcolunas hierárquicas (MultiIndex)
 dados_multi_coluna = {
     ("Métrica / Indicador", ""): indicadores_linhas,
     
-    ("RE", "Meta"): ["84.0% (Q1: 91%)", "Conforme dim.", "≤ 2 Abs", "90%", "95%", "-", "6 a 10 Abs", "95%"],
-    ("RE", "Peso"): ["35%", "30%", "10%", "25%", "-", "0%", "0%", "-"],
+    ("RE", "Meta"): ["84.0% (Q1: 91%)", "Conforme dim.", "≤ 2 Abs", "90% (Q1: 95%)", "-", "6 a 10 Abs", "95%"],
+    ("RE", "Peso"): ["35%", "30%", "10%", "25%", "0%", "0%", "-"],
     
-    ("MONO", "Meta"): [meta_csat_mono, "Conforme dim.", "≤ 2 Abs", "90%", "95%", "-", "≤ 5 Abs", "95%"],
-    ("MONO", "Peso"): [peso_csat_mono, "30%", "10%", "25%", "-", "0%", "0%", "-"],
+    ("MONO", "Meta"): [meta_csat_mono, "Conforme dim.", "≤ 2 Abs", "90% (Q1: 95%)", "-", "≤ 5 Abs", "95%"],
+    ("MONO", "Peso"): [peso_csat_mono, "30%", "10%", "25%", "0%", "0%", "-"],
     
-    ("MULTI", "Meta"): ["Fone: 90% / Dig: 80%", "Conforme dim.", "≤ 2 Abs", "90%", "95%", "88% (Q1: 93.5%)", "-", "95%"],
-    ("MULTI", "Peso"): [peso_csat_multi, "30%", "10%", "15%", "-", "15%", "0%", "-"],
+    ("MULTI", "Meta"): ["Fone: 90% / Dig: 80%", "Conforme dim.", "≤ 2 Abs", "90% (Q1: 95%)", "88% (Q1: 93.5%)", "-", "95%"],
+    ("MULTI", "Peso"): [peso_csat_multi, "30%", "10%", "15%", "15%", "0%", "-"],
     
-    ("CSF Interno", "Meta"): ["Inativo", "Conforme dim.", "-", "75%", "83%", "88% (Q1: 93.5%)", "-", "-"],
-    ("CSF Interno", "Peso"): ["0%", "30%", "0%", "45%", "-", "25%", "0%", "-"],
+    ("CSF Interno", "Meta"): ["Inativo", "Conforme dim.", "-", "75% (Q1: 83%)", "88% (Q1: 93.5%)", "-", "-"],
+    ("CSF Interno", "Peso"): ["0%", "30%", "0%", "45%", "25%", "0%", "-"],
     
-    ("CSF Ajuda", "Meta"): ["Inativo", "Sem Meta", "1 Abs", "75%", "83%", "88% (Q1: 93.5%)", "-", "-"],
-    ("CSF Ajuda", "Peso"): ["0%", "0%", "30%", "50%", "-", "20%", "0%", "-"],
+    ("CSF Ajuda", "Meta"): ["Inativo", "Sem Meta", "1 Abs", "75% (Q1: 83%)", "88% (Q1: 93.5%)", "-", "-"],
+    ("CSF Ajuda", "Peso"): ["0%", "0%", "30%", "50%", "20%", "0%", "-"],
     
-    ("CSF Quality", "Meta"): ["Inativo", "Conforme dim.", "1 Abs", "75%", "83%", "-", "15%", "-"],
-    ("CSF Quality", "Peso"): ["0%", "30%", "10%", "45%", "-", "0%", "15%", "-"]
+    ("CSF Quality", "Meta"): ["Inativo", "Conforme dim.", "1 Abs", "75% (Q1: 83%)", "-", "15%", "-"],
+    ("CSF Quality", "Peso"): ["0%", "30%", "10%", "45%", "0%", "15%", "-"]
 }
 
 # Criando o DataFrame Multi-Nível
@@ -169,12 +168,20 @@ for c in clusters_filtrados:
 
 df_matriz_exibicao = df_matriz_complexa[colunas_manter]
 
-# Renderizando com suporte nativo a cabeçalhos multinível do Streamlit
-st.dataframe(df_matriz_exibicao, use_container_width=True, hide_index=True)
+# Mapeamento para forçar a CENTRALIZAÇÃO de dados e cabeçalhos de todas as colunas dinâmicas
+config_colunas = {
+    ("Métrica / Indicador", ""): st.column_config.Column(alignment="center")
+}
+for c in clusters_filtrados:
+    config_colunas[(c, "Meta")] = st.column_config.Column(alignment="center")
+    config_colunas[(c, "Peso")] = st.column_config.Column(alignment="center")
+
+# Renderizando com suporte nativo a cabeçalhos multinível e alinhamento centralizado
+st.dataframe(df_matriz_exibicao, use_container_width=True, hide_index=True, column_config=config_colunas)
 
 
 # ==============================================================================
-# QUADRO 2: RESUMO INVERTIDO (PILARES EM LINHAS, CLUSTERS EM COLUNAS)
+# QUADRO 2: RESUMO INVERTIDO (CENTRALIZADO)
 # ==============================================================================
 st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
 
@@ -195,12 +202,18 @@ dados_soma_dimensoes = {
 colunas_dimensoes_exibicao = ["Dimensão Estratégica / Pilar"] + clusters_filtrados
 df_dimensoes = pd.DataFrame(dados_soma_dimensoes)[colunas_dimensoes_exibicao]
 
-st.dataframe(df_dimensoes, use_container_width=True, hide_index=True)
+config_resumo = {
+    "Dimensão Estratégica / Pilar": st.column_config.Column(alignment="center")
+}
+for c in clusters_filtrados:
+    config_resumo[c] = st.column_config.Column(alignment="center")
+
+st.dataframe(df_dimensoes, use_container_width=True, hide_index=True, column_config=config_resumo)
 st.divider()
 
 
 # ==============================================================================
-# GRÁFICO COMPARATIVO EXECUTIVO COM RÓTULOS DINÂMICOS
+# GRÁFICO COMPARATIVO EXECUTIVO COM LEGENDAS AJUSTADAS
 # ==============================================================================
 st.subheader("📊 Campo Comparativo: Visão Gráfica da Arquitetura de Pesos")
 
@@ -212,7 +225,7 @@ fig = go.Figure()
 
 fig.add_trace(go.Bar(
     x=clusters_filtrados, y=valores_csat, 
-    name='🧠 Experiência (CSAT)', 
+    name='🧠 Experiência',  # Sigla CSAT removida da legenda
     marker_color='#1e3a8a',
     text=[f"{v}%" if v > 0 else "" for v in valores_csat],
     textposition='inside',
