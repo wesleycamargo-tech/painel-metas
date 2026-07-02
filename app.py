@@ -69,13 +69,14 @@ st.markdown("""
         padding: 12px 10px;
         border: 1px solid #e2e8f0;
         text-align: center !important;
-        color: #0f172a;
+        color: #0f172a; /* Garante fonte preta padrão para dados ativos e pesos */
     }
-    /* Estilo para itens inativos ou sem meta (cinza claro) */
-    .text-muted-gray {
+    /* Estilo exclusivo para metas zeradas/ausentes (cinza claro) */
+    .meta-muted-gray {
         color: #94a3b8 !important;
+        font-weight: normal !important;
     }
-    /* Estilo para a linha do TMA (texto cinza) */
+    /* Estilo para a linha do TMA (texto cinza corporativo) */
     .linha-tma td {
         color: #64748b !important;
     }
@@ -151,42 +152,36 @@ else:
         "CSF Interno": ["0%", "40%", "60%"], "CSF Ajuda": ["0%", "40%", "60%"], "CSF Quality": ["0%", "50%", "50%"]
     }
 
-# Função auxiliar para formatar células vazias/inativas em cinza
-def fmt(texto):
-    if texto in ["-", "Inativo", "Sem Meta", "0%"]:
-        return f'<span class="text-muted-gray">{texto}</span>'
-    return texto
-
 # ==============================================================================
-# QUADRO 1: MATRIZ DE INDICADORES (CONSTRUÇÃO DO HTML DINÂMICO PARA SUPORTAR OS AJUSTES)
+# QUADRO 1: MATRIZ DE INDICADORES (HTML DINÂMICO COM TRATAMENTO DE CORES SELETIVAS)
 # ==============================================================================
 st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
 
-# Base de dados estruturada
+# Base de dados estruturada com as metas e pesos
 dados_base = {
     "CSAT": {
         "RE": ("84.0% (Q1: 91%)", "35%"), "MONO": (meta_csat_mono, peso_csat_mono), "MULTI": ("Fone: 90% / Dig: 80%", peso_csat_multi),
-        "CSF Interno": ("Inativo", "-"), "CSF Ajuda": ("Inativo", "-"), "CSF Quality": ("Inativo", "-")
+        "CSF Interno": ("Inativo", "0%"), "CSF Ajuda": ("Inativo", "0%"), "CSF Quality": ("Inativo", "0%")
     },
     "TMA / TMT": {
         "RE": ("Conforme dim.", "30%"), "MONO": ("Conforme dim.", "30%"), "MULTI": ("Conforme dim.", "30%"),
-        "CSF Interno": ("Conforme dim.", "30%"), "CSF Ajuda": ("Sem Meta", "-"), "CSF Quality": ("Conforme dim.", "30%")
+        "CSF Interno": ("Conforme dim.", "30%"), "CSF Ajuda": ("-", "0%"), "CSF Quality": ("Conforme dim.", "30%")
     },
     "Improcedência Devida": {
         "RE": ("≤ 2 Abs", "10%"), "MONO": ("≤ 2 Abs", "10%"), "MULTI": ("≤ 2 Abs", "10%"),
-        "CSF Interno": ("-", "-"), "CSF Ajuda": ("1 Abs", "30%"), "CSF Quality": ("1 Abs", "10%")
+        "CSF Interno": ("-", "0%"), "CSF Ajuda": ("1 Abs", "30%"), "CSF Quality": ("1 Abs", "10%")
     },
     "Nota de Monitoria": {
         "RE": ("90% (Q1: 95%)", "25%"), "MONO": ("90% (Q1: 95%)", "25%"), "MULTI": ("90% (Q1: 95%)", "15%"),
         "CSF Interno": ("75% (Q1: 83%)", "45%"), "CSF Ajuda": ("75% (Q1: 83%)", "50%"), "CSF Quality": ("75% (Q1: 83%)", "45%")
     },
     "Aderência à Escala": {
-        "RE": ("-", "-"), "MONO": ("-", "-"), "MULTI": ("88% (Q1: 93.5%)", "15%"),
-        "CSF Interno": ("88% (Q1: 93.5%)", "25%"), "CSF Ajuda": ("88% (Q1: 93.5%)", "20%"), "CSF Quality": ("-", "-")
+        "RE": ("-", "0%"), "MONO": ("-", "0%"), "MULTI": ("88% (Q1: 93.5%)", "15%"),
+        "CSF Interno": ("88% (Q1: 93.5%)", "25%"), "CSF Ajuda": ("88% (Q1: 93.5%)", "20%"), "CSF Quality": ("-", "0%")
     },
     "Evasão de Pausas": {
-        "RE": ("6 a 10 Abs", "-"), "MONO": ("≤ 5 Abs", "-"), "MULTI": ("-", "-"),
-        "CSF Interno": ("-", "-"), "CSF Ajuda": ("-", "-"), "CSF Quality": ("15%", "15%")
+        "RE": ("6 a 10 Abs", "0%"), "MONO": ("≤ 5 Abs", "0%"), "MULTI": ("-", "0%"),
+        "CSF Interno": ("-", "0%"), "CSF Ajuda": ("-", "0%"), "CSF Quality": ("15%", "15%")
     },
     "Treinamento": {
         "RE": ("95%", "-"), "MONO": ("95%", "-"), "MULTI": ("95%", "-"),
@@ -194,7 +189,7 @@ dados_base = {
     }
 }
 
-# Criando o cabeçalho duplo em HTML puro baseado no filtro da sidebar
+# Criando a montagem do cabeçalho HTML multinível
 html_tabela = '<table class="table-executiva"><thead>'
 html_tabela += '<tr><th rowspan="2">Métrica / Indicador</th>'
 for cluster in clusters_filtrados:
@@ -204,23 +199,33 @@ for cluster in clusters_filtrados:
     html_tabela += '<th>Meta</th><th>Peso</th>'
 html_tabela += '</tr></thead><tbody>'
 
-# Preenchendo as linhas e aplicando as classes de estilo cinza
 icones = {"CSAT": "💻 ", "TMA / TMT": "⏱️ ", "Improcedência Devida": "🚫 ", "Nota de Monitoria": "🎧 ", "Aderência à Escala": "📅 ", "Evasão de Pausas": "🛑 ", "Treinamento": "🧠 "}
 
 for indicador, valores in dados_base.items():
     classe_linha = ' class="linha-tma"' if indicador == "TMA / TMT" else ''
     html_tabela += f'<tr{classe_linha}><td><b>{icones[indicador]}{indicador}</b></td>'
+    
     for cluster in clusters_filtrados:
         meta_val, peso_val = valores[cluster]
-        html_tabela += f'<td>{fmt(meta_val)}</td><td>{fmt(peso_val)}</td>'
-    html_tabela += '</tr>'
+        
+        # Regra do Peso: Sempre se mantém com cor padrão (Preto ou cinza da linha do TMA)
+        celula_peso = f'<td>{peso_val}</td>'
+        
+        # Regra da Meta: Se estiver zerada/vazia/inativa, ganha a classe cinza claro
+        if meta_val in ["-", "Inativo", "Sem Meta"]:
+            celula_meta = f'<td class="meta-muted-gray">{meta_val}</td>'
+        else:
+            celula_meta = f'<td>{meta_val}</td>'
+            
+        html_tabela += celula_meta + celula_peso
 
+html_tabela += '</tr>'
 html_tabela += '</tbody></table>'
 st.html(html_tabela)
 
 
 # ==============================================================================
-# QUADRO 2: RESUMO INVERTIDO (HTML PURO CENTRALIZADO)
+# QUADRO 2: RESUMO INVERTIDO (SOMA DOS PILARES)
 # ==============================================================================
 st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
 
@@ -238,7 +243,10 @@ html_resumo += '</tr></thead><tbody>'
 for pilar, valores in dados_resumo:
     html_resumo += f'<tr><td style="text-align: left !important; font-weight: bold;">{pilar}</td>'
     for val in valores:
-        html_resumo += f'<td>{fmt(val)}</td>'
+        if val in ["0%", "-"]:
+            html_resumo += f'<td class="meta-muted-gray">{val}</td>'
+        else:
+            html_resumo += f'<td>{val}</td>'
     html_resumo += '</tr>'
 
 html_resumo += '</tbody></table>'
