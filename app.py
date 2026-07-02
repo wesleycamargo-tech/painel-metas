@@ -69,15 +69,15 @@ st.markdown("""
         padding: 12px 10px;
         border: 1px solid #e2e8f0;
         text-align: center !important;
-        color: #0f172a; /* Garante fonte preta padrão para dados ativos e pesos */
+        color: #0f172a !important; /* Força fonte preta padrão para todos os dados e pesos */
     }
     /* Estilo exclusivo para metas zeradas/ausentes (cinza claro) */
     .meta-muted-gray {
         color: #94a3b8 !important;
         font-weight: normal !important;
     }
-    /* Estilo para a linha do TMA (texto cinza corporativo) */
-    .linha-tma td {
+    /* Estilo específico apenas para o texto da meta de TMA */
+    .meta-tma-gray {
         color: #64748b !important;
     }
     </style>
@@ -157,7 +157,6 @@ else:
 # ==============================================================================
 st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
 
-# Base de dados estruturada com as metas e pesos
 dados_base = {
     "CSAT": {
         "RE": ("84.0% (Q1: 91%)", "35%"), "MONO": (meta_csat_mono, peso_csat_mono), "MULTI": ("Fone: 90% / Dig: 80%", peso_csat_multi),
@@ -189,7 +188,6 @@ dados_base = {
     }
 }
 
-# Criando a montagem do cabeçalho HTML multinível
 html_tabela = '<table class="table-executiva"><thead>'
 html_tabela += '<tr><th rowspan="2">Métrica / Indicador</th>'
 for cluster in clusters_filtrados:
@@ -202,18 +200,22 @@ html_tabela += '</tr></thead><tbody>'
 icones = {"CSAT": "💻 ", "TMA / TMT": "⏱️ ", "Improcedência Devida": "🚫 ", "Nota de Monitoria": "🎧 ", "Aderência à Escala": "📅 ", "Evasão de Pausas": "🛑 ", "Treinamento": "🧠 "}
 
 for indicador, valores in dados_base.items():
-    classe_linha = ' class="linha-tma"' if indicador == "TMA / TMT" else ''
-    html_tabela += f'<tr{classe_linha}><td><b>{icones[indicador]}{indicador}</b></td>'
+    html_tabela += '<tr><td><b>{}{}</b></td>'.format(icones[indicador], indicador)
     
     for cluster in clusters_filtrados:
         meta_val, peso_val = valores[cluster]
         
-        # Regra do Peso: Sempre se mantém com cor padrão (Preto ou cinza da linha do TMA)
+        # O Peso SEMPRE se mantém na cor padrão (Preto)
         celula_peso = f'<td>{peso_val}</td>'
         
-        # Regra da Meta: Se estiver zerada/vazia/inativa, ganha a classe cinza claro
-        if meta_val in ["-", "Inativo", "Sem Meta"]:
+        # Regras de cores exclusivas para a coluna de META
+        if meta_val in ["-", "Inativo"]:
             celula_meta = f'<td class="meta-muted-gray">{meta_val}</td>'
+        elif indicador == "TMA / TMT":
+            if meta_val == "-":
+                celula_meta = f'<td class="meta-muted-gray">{meta_val}</td>'
+            else:
+                celula_meta = f'<td class="meta-tma-gray">{meta_val}</td>' # Meta ativa de TMA em cinza corporativo
         else:
             celula_meta = f'<td>{meta_val}</td>'
             
