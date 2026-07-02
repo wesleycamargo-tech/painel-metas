@@ -69,7 +69,7 @@ st.divider()
 try:
     df_raw = pd.read_csv("metas.csv", header=None)
     
-    # Busca apenas a palavra-chave principal (julho ou junho) de forma flexível
+    # Busca apenas a palavra-chave principal (julho ou junho)
     mes_procurado = "julho" if "Julho" in competencia else "junho"
     
     linha_inicio = None
@@ -90,7 +90,7 @@ try:
             primeira_celula = str(row.iloc[0]).strip()
             row_str = [str(c).strip().upper() for c in row if pd.notna(c)]
             
-            # Condição de parada flexível: se achar outro mês abaixo ou fim de histórico, para
+            # Condição de parada flexível
             if idx > (linha_inicio + 2) and (
                 ("junho" in primeira_celula.lower() and mes_procurado == "julho") or 
                 ("julho" in primeira_celula.lower() and mes_procurado == "junho") or 
@@ -100,13 +100,13 @@ try:
             ):
                 break
                 
-            # Identificação do cabeçalho procurando os termos reais das colunas
+            # Identificação do cabeçalho
             if "CSF INTERNO" in row_str or "RE" in row_str or "CSF QUALITY" in row_str:
                 colunas_cabecalho = [str(c).strip().upper() if pd.notna(c) and str(c).strip() != "" else f"COL_{i}" for i, c in enumerate(row)]
                 colunas_cabecalho[0] = "INDICADOR"
                 continue
                 
-            # Captura a linha de dados se não for vazia ou de ponderação
+            # Captura a linha de dados
             if primeira_celula != "nan" and primeira_celula != "":
                 if "PONDERAÇÃO" in primeira_celula.upper() or "FAIXAS" in primeira_celula.upper() or "METAS" in primeira_celula.upper():
                     continue
@@ -114,9 +114,7 @@ try:
 
         if len(linhas_bloco) == 0:
             st.warning(f"Buscando estrutura de dados... O bloco '{mes_procurado}' foi localizado, mas suas linhas internas estão em formato de leitura incompatível.")
-            st.info("Dica: Certifique-se de que a palavra 'RE' ou 'CSF INTERNO' está escrita logo acima dos indicadores desse mês.")
         else:
-            # Caso o cabeçalho não tenha sido detectado automaticamente, força o padrão
             if len(colunas_cabecalho) == 0:
                 colunas_cabecalho = ["INDICADOR", "RE", "CSF INTERNO", "CSF AJUDA", "CSF QUALITY"]
             
@@ -202,4 +200,26 @@ try:
                 html_resumo += f'<tr><td style="text-align: left !important; font-weight: bold;">{pilar}</td>'
                 for val in valores:
                     if val in ["0%", "-", "0"]: html_resumo += f'<td class="meta-muted-gray">{val}</td>'
-                    else: html_res
+                    else: html_resumo += f'<td>{val}</td>'
+                html_resumo += '</tr>'
+            html_resumo += '</tbody></table>'
+            st.html(html_resumo)
+            st.divider()
+
+            # ==============================================================================
+            # GRÁFICO COMPARATIVO
+            # ==============================================================================
+            st.subheader("📊 Campo Comparativo: Visão Gráfica da Arquitetura de Pesos")
+            valores_csat = [grafico_pesos.get(c, [0, 0, 0])[0] for c in clusters_filtrados]
+            valores_eficiencia = [grafico_pesos.get(c, [0, 0, 0])[1] for c in clusters_filtrados]
+            valores_disciplina = [grafico_pesos.get(c, [0, 0, 0])[2] for c in clusters_filtrados]
+
+            fig = go.Figure()
+            fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_csat, name='🧠 Experiência', marker_color='#1e3a8a', text=[f"{v}%" if v > 0 else "" for v in valores_csat], textposition='inside', textfont=dict(color='white', weight='bold')))
+            fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_eficiencia, name='⚡ Eficiência', marker_color='#475569', text=[f"{v}%" if v > 0 else "" for v in valores_eficiencia], textposition='inside', textfont=dict(color='white', weight='bold')))
+            fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_disciplina, name='📋 Disciplina e Qualidade', marker_color='#0f766e', text=[f"{v}%" if v > 0 else "" for v in valores_disciplina], textposition='inside', textfont=dict(color='white', weight='bold')))
+            fig.update_layout(barmode='stack', plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=400, margin=dict(l=20, r=20, t=10, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5), yaxis=dict(title="Distribuição de Peso (%)", gridcolor="#e2e8f0"))
+            st.plotly_chart(fig, use_container_width=True)
+
+except Exception as e:
+    st.error(f"Erro ao processar o arquivo metas.csv: {e}")
