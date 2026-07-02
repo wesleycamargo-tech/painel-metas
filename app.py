@@ -81,7 +81,7 @@ st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **C
 st.divider()
 
 # ==============================================================================
-# LÓGICA DE ALTERAÇÃO DE DADOS POR MÊS (CORREÇÃO DO FILTRO)
+# LÓGICA DE ALTERAÇÃO DE DADOS POR MÊS
 # ==============================================================================
 if "Julho" in competencia:
     peso_csat_mono, peso_csat_multi = "35%", "30%"
@@ -118,36 +118,63 @@ else:
     }
 
 # ==============================================================================
-# QUADRO 1: MATRIZ DE INDICADORES (INVERTIDA: INDICADORES NAS LINHAS)
+# QUADRO 1: MATRIZ DE INDICADORES (COLUNAS DUPLAS: CLUSTER -> META | PESO)
 # ==============================================================================
 st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
 
-dados_matriz_invertida = {
-    "Métrica / Indicador": [
-        "💻 CSAT (Meta)", "⚖️ CSAT (Peso)",
-        "⏱️ TMA/TMT (Meta)", "⚖️ TMA/TMT (Peso)",
-        "🚫 Improcedência (Meta)", "⚖️ Improcedência (Peso)",
-        "🎧 Monitoria Base (Meta)", "🎧 Monitoria Q1 (Meta)", "⚖️ Monitoria (Peso)",
-        "📅 Aderência à Escala (Meta)", "⚖️ Aderência à Escala (Peso)",
-        "🛑 Evasão de Pausas (Meta)", "⚖️ Evasão de Pausas (Peso)",
-        "🧠 Treinamento Regulamentar (Meta)"
-    ],
-    "RE": ["84.0% (Q1: 91%)", "35%", "Conforme dim.", "30%", "≤ 2 Abs", "10%", "90%", "95%", "25%", "-", "0%", "6 a 10 Abs", "0%", "95%"],
-    "MONO": [meta_csat_mono, peso_csat_mono, "Conforme dim.", "30%", "≤ 2 Abs", "10%", "90%", "95%", "25%", "-", "0%", "≤ 5 Abs", "0%", "95%"],
-    "MULTI": ["Fone: 90% / Dig: 80%", peso_csat_multi, "Conforme dim.", "30%", "≤ 2 Abs", "10%", "90%", "95%", "15%", "88% (Q1: 93.5%)", "15%", "-", "0%", "95%"],
-    "CSF Interno": ["Inativo", "0%", "Conforme dim.", "30%", "-", "0%", "75%", "83%", "45%", "88% (Q1: 93.5%)", "25%", "-", "0%", "-"],
-    "CSF Ajuda": ["Inativo", "0%", "Sem Meta", "0%", "1 Abs", "30%", "75%", "83%", "50%", "88% (Q1: 93.5%)", "20%", "-", "0%", "-"],
-    "CSF Quality": ["Inativo", "0%", "Conforme dim.", "30%", "1 Abs", "10%", "75%", "83%", "45%", "-", "0%", "15%", "15%", "-"]
+# Lista completa de indicadores que ficarão fixos nas linhas
+indicadores_linhas = [
+    "💻 CSAT Geral / Canais",
+    "⏱️ TMA / TMT (Tempo Médio)",
+    "🚫 Improcedência Devida",
+    "🎧 Nota de Monitoria (Base)",
+    "🎧 Nota de Monitoria (Q1)",
+    "📅 Aderência à Escala",
+    "🛑 Evasão de Pausas",
+    "🧠 Treinamento Regulamentar"
+]
+
+# Construindo o dicionário com tuplas para criar as subcolunas hierárquicas (MultiIndex)
+dados_multi_coluna = {
+    ("Métrica / Indicador", ""): indicadores_linhas,
+    
+    ("RE", "Meta"): ["84.0% (Q1: 91%)", "Conforme dim.", "≤ 2 Abs", "90%", "95%", "-", "6 a 10 Abs", "95%"],
+    ("RE", "Peso"): ["35%", "30%", "10%", "25%", "-", "0%", "0%", "-"],
+    
+    ("MONO", "Meta"): [meta_csat_mono, "Conforme dim.", "≤ 2 Abs", "90%", "95%", "-", "≤ 5 Abs", "95%"],
+    ("MONO", "Peso"): [peso_csat_mono, "30%", "10%", "25%", "-", "0%", "0%", "-"],
+    
+    ("MULTI", "Meta"): ["Fone: 90% / Dig: 80%", "Conforme dim.", "≤ 2 Abs", "90%", "95%", "88% (Q1: 93.5%)", "-", "95%"],
+    ("MULTI", "Peso"): [peso_csat_multi, "30%", "10%", "15%", "-", "15%", "0%", "-"],
+    
+    ("CSF Interno", "Meta"): ["Inativo", "Conforme dim.", "-", "75%", "83%", "88% (Q1: 93.5%)", "-", "-"],
+    ("CSF Interno", "Peso"): ["0%", "30%", "0%", "45%", "-", "25%", "0%", "-"],
+    
+    ("CSF Ajuda", "Meta"): ["Inativo", "Sem Meta", "1 Abs", "75%", "83%", "88% (Q1: 93.5%)", "-", "-"],
+    ("CSF Ajuda", "Peso"): ["0%", "0%", "30%", "50%", "-", "20%", "0%", "-"],
+    
+    ("CSF Quality", "Meta"): ["Inativo", "Conforme dim.", "1 Abs", "75%", "83%", "-", "15%", "-"],
+    ("CSF Quality", "Peso"): ["0%", "30%", "10%", "45%", "-", "0%", "15%", "-"]
 }
 
-colunas_matriz_exibicao = ["Métrica / Indicador"] + clusters_filtrados
-df_matriz = pd.DataFrame(dados_matriz_invertida)[colunas_matriz_exibicao]
+# Criando o DataFrame Multi-Nível
+df_matriz_complexa = pd.DataFrame(dados_multi_coluna)
+df_matriz_complexa.columns = pd.MultiIndex.from_tuples(df_matriz_complexa.columns)
 
-st.dataframe(df_matriz, use_container_width=True, hide_index=True)
+# Regra de Filtragem dinâmica das Colunas Principais (Clusters)
+colunas_manter = [("Métrica / Indicador", "")]
+for c in clusters_filtrados:
+    colunas_manter.append((c, "Meta"))
+    colunas_manter.append((c, "Peso"))
+
+df_matriz_exibicao = df_matriz_complexa[colunas_manter]
+
+# Renderizando com suporte nativo a cabeçalhos multinível do Streamlit
+st.dataframe(df_matriz_exibicao, use_container_width=True, hide_index=True)
 
 
 # ==============================================================================
-# QUADRO 2: RESUMO INVERTIDO SEM A LINHA DE TOTAL
+# QUADRO 2: RESUMO INVERTIDO (PILARES EM LINHAS, CLUSTERS EM COLUNAS)
 # ==============================================================================
 st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
 
