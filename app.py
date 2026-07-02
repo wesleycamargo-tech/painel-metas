@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 
 # Configuração da página Lumia / Streamlit
 st.set_page_config(
-    page_title="Painel Executivo de Metas do Quadrante",
+    page_title="Painel de Metas & Pesos CEX",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -19,6 +19,25 @@ st.markdown("""
         padding-bottom: 0rem !important;
     }
     .main { background-color: #f8f9fa; }
+    
+    /* Estrutura do Cabeçalho com Logo */
+    .header-container {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 5px;
+    }
+    .brand-logo {
+        height: 45px;
+        object-fit: contain;
+    }
+    .brand-title {
+        font-family: sans-serif;
+        color: #0f172a;
+        margin: 0 !important;
+        font-size: 32px;
+        font-weight: 700;
+    }
     
     /* Títulos de seções elegantes */
     .macro-title {
@@ -110,8 +129,14 @@ elif filtro_macro == "CSF (Interno, Ajuda, Quality)":
 else:
     clusters_filtrados = clusters_totais
 
-# --- TÍTULO PRINCIPAL (COLADO NO TOPO) ---
-st.title("📊 Painel Executivo Unificado de Metas")
+# --- TÍTULO DO PAINEL ATUALIZADO COM LOGO DO BOTICÁRIO ---
+st.markdown("""
+    <div class="header-container">
+        <img src="https://upload.wikimedia.org/wikipedia/pt/e/e9/Logotipo_Grupo_Botic%C3%A1rio.png" class="brand-logo">
+        <h1 class="brand-title">Painel de Metas & Pesos CEX</h1>
+    </div>
+""", unsafe_allow_html=True)
+
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
@@ -153,7 +178,7 @@ else:
     }
 
 # ==============================================================================
-# QUADRO 1: MATRIZ DE INDICADORES (HTML DINÂMICO COM TRATAMENTO DE CORES SELETIVAS)
+# QUADRO 1: MATRIZ DE INDICADORES (HTML DINÂMICO)
 # ==============================================================================
 st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
 
@@ -205,17 +230,15 @@ for indicador, valores in dados_base.items():
     for cluster in clusters_filtrados:
         meta_val, peso_val = valores[cluster]
         
-        # O Peso SEMPRE se mantém na cor padrão (Preto)
         celula_peso = f'<td>{peso_val}</td>'
         
-        # Regras de cores exclusivas para a coluna de META
         if meta_val in ["-", "Inativo"]:
             celula_meta = f'<td class="meta-muted-gray">{meta_val}</td>'
         elif indicador == "TMA / TMT":
             if meta_val == "-":
                 celula_meta = f'<td class="meta-muted-gray">{meta_val}</td>'
             else:
-                celula_meta = f'<td class="meta-tma-gray">{meta_val}</td>' # Meta ativa de TMA em cinza corporativo
+                celula_meta = f'<td class="meta-tma-gray">{meta_val}</td>'
         else:
             celula_meta = f'<td>{meta_val}</td>'
             
@@ -257,7 +280,7 @@ st.divider()
 
 
 # ==============================================================================
-# GRÁFICO COMPARATIVO EXECUTIVO COM LEGENDAS AJUSTADAS
+# GRÁFICO COMPARATIVO EXECUTIVO
 # ==============================================================================
 st.subheader("📊 Campo Comparativo: Visão Gráfica da Arquitetura de Pesos")
 
