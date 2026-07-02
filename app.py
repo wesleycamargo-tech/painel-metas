@@ -64,7 +64,7 @@ filtro_macro = st.sidebar.radio(
     ["Ver Todas as Clusters", "CRC (MONO + MULTI)", "RE", "CSF (Interno, Ajuda, Quality)"]
 )
 
-# Regra de filtragem das frentes
+# Regra de filtragem das frentes (Colunas)
 clusters_totais = ["RE", "MONO", "MULTI", "CSF Interno", "CSF Ajuda", "CSF Quality"]
 if filtro_macro == "CRC (MONO + MULTI)":
     clusters_filtrados = ["MONO", "MULTI"]
@@ -95,7 +95,6 @@ if "Julho" in competencia:
         "CSF Interno": ["0%", "30%", "70%"], "CSF Ajuda": ["0%", "30%", "70%"], "CSF Quality": ["0%", "40%", "60%"]
     }
 elif "Junho" in competencia:
-    # Simulação de histórico de Junho
     peso_csat_mono, peso_csat_multi = "40%", "35%"
     meta_csat_mono = "Fone: 87% / Dig: 80%"
     grafico_pesos = {
@@ -107,7 +106,6 @@ elif "Junho" in competencia:
         "CSF Interno": ["0%", "35%", "65%"], "CSF Ajuda": ["0%", "25%", "75%"], "CSF Quality": ["0%", "45%", "55%"]
     }
 else:
-    # Simulação de histórico de Maio
     peso_csat_mono, peso_csat_multi = "40%", "40%"
     meta_csat_mono = "Geral: 85%"
     grafico_pesos = {
@@ -120,47 +118,36 @@ else:
     }
 
 # ==============================================================================
-# QUADRO 1: MATRIZ DE INDICADORES E PESOS (CABEÇALHOS SEPARADOS)
+# QUADRO 1: MATRIZ DE INDICADORES (INVERTIDA: INDICADORES NAS LINHAS)
 # ==============================================================================
 st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
 
-dados_matriz_unica = {
-    "Cluster": ["RE", "MONO", "MULTI", "CSF Interno", "CSF Ajuda", "CSF Quality"],
-    "CSAT_Meta": ["84.0% (Q1: 91%)", meta_csat_mono, "Fone: 90% / Dig: 80%", "Inativo", "Inativo", "Inativo"],
-    "CSAT_Peso": ["35%", peso_csat_mono, peso_csat_multi, "0%", "0%", "0%"],
-    "TMA_Meta": ["Conforme dim.", "Conforme dim.", "Conforme dim.", "Conforme dim.", "Sem Meta", "Conforme dim."],
-    "TMA_Peso": ["30%", "30%", "30%", "30%", "0%", "30%"],
-    "Improc_Meta": ["≤ 2 Abs", "≤ 2 Abs", "≤ 2 Abs", "-", "1 Abs", "1 Abs"],
-    "Improc_Peso": ["10%", "10%", "10%", "0%", "30%", "10%"],
-    "Monit_Base": ["90%", "90%", "90%", "75%", "75%", "75%"],
-    "Monit_Q1": ["95%", "95%", "95%", "83%", "83%", "83%"],
-    "Monit_Peso": ["25%", "25%", "15%", "45%", "50%", "45%"],
-    "Ader_Meta": ["-", "-", "88% (Q1: 93.5%)", "88% (Q1: 93.5%)", "88% (Q1: 93.5%)", "-"],
-    "Ader_Peso": ["0%", "0%", "15%", "25%", "20%", "0%"],
-    "Evasao_Meta": ["6 a 10 Abs", "≤ 5 Abs", "-", "-", "-", "15%"],
-    "Evasao_Peso": ["0%", "0%", "0%", "0%", "0%", "15%"]
+dados_matriz_invertida = {
+    "Métrica / Indicador": [
+        "💻 CSAT (Meta)", "⚖️ CSAT (Peso)",
+        "⏱️ TMA/TMT (Meta)", "⚖️ TMA/TMT (Peso)",
+        "🚫 Improcedência (Meta)", "⚖️ Improcedência (Peso)",
+        "🎧 Monitoria Base (Meta)", "🎧 Monitoria Q1 (Meta)", "⚖️ Monitoria (Peso)",
+        "📅 Aderência à Escala (Meta)", "⚖️ Aderência à Escala (Peso)",
+        "🛑 Evasão de Pausas (Meta)", "⚖️ Evasão de Pausas (Peso)",
+        "🧠 Treinamento Regulamentar (Meta)"
+    ],
+    "RE": ["84.0% (Q1: 91%)", "35%", "Conforme dim.", "30%", "≤ 2 Abs", "10%", "90%", "95%", "25%", "-", "0%", "6 a 10 Abs", "0%", "95%"],
+    "MONO": [meta_csat_mono, peso_csat_mono, "Conforme dim.", "30%", "≤ 2 Abs", "10%", "90%", "95%", "25%", "-", "0%", "≤ 5 Abs", "0%", "95%"],
+    "MULTI": ["Fone: 90% / Dig: 80%", peso_csat_multi, "Conforme dim.", "30%", "≤ 2 Abs", "10%", "90%", "95%", "15%", "88% (Q1: 93.5%)", "15%", "-", "0%", "95%"],
+    "CSF Interno": ["Inativo", "0%", "Conforme dim.", "30%", "-", "0%", "75%", "83%", "45%", "88% (Q1: 93.5%)", "25%", "-", "0%", "-"],
+    "CSF Ajuda": ["Inativo", "0%", "Sem Meta", "0%", "1 Abs", "30%", "75%", "83%", "50%", "88% (Q1: 93.5%)", "20%", "-", "0%", "-"],
+    "CSF Quality": ["Inativo", "0%", "Conforme dim.", "30%", "1 Abs", "10%", "75%", "83%", "45%", "-", "0%", "15%", "15%", "-"]
 }
 
-df_matriz = pd.DataFrame(dados_matriz_unica)
-df_matriz_filtrada = df_matriz[df_matriz["Cluster"].isin(clusters_filtrados)]
+colunas_matriz_exibicao = ["Métrica / Indicador"] + clusters_filtrados
+df_matriz = pd.DataFrame(dados_matriz_invertida)[colunas_matriz_exibicao]
 
-# Renomeando colunas via column_config para criar o efeito "Indicador: Meta | Peso" separado por colunas limpas
-st.dataframe(
-    df_matriz_filtrada, 
-    use_container_width=True, 
-    hide_index=True,
-    column_config={
-        "CSAT_Meta": "CSAT: Meta", "CSAT_Peso": "CSAT: Peso",
-        "TMA_Meta": "TMA/TMT: Meta", "TMA_Peso": "TMA/TMT: Peso",
-        "Improc_Meta": "Improcedência: Meta", "Improc_Peso": "Improcedência: Peso",
-        "Monit_Base": "Monitoria: Base", "Monit_Q1": "Monitoria: Q1", "Monit_Peso": "Monitoria: Peso",
-        "Ader_Meta": "Aderência: Meta", "Ader_Peso": "Aderência: Peso",
-        "Evasao_Meta": "Evasão: Meta", "Evasao_Peso": "Evasão: Peso"
-    }
-)
+st.dataframe(df_matriz, use_container_width=True, hide_index=True)
+
 
 # ==============================================================================
-# QUADRO 2: RESUMO INVERTIDO (PILARES EM LINHAS, CLUSTERS EM COLUNAS)
+# QUADRO 2: RESUMO INVERTIDO SEM A LINHA DE TOTAL
 # ==============================================================================
 st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
 
@@ -168,15 +155,14 @@ dados_soma_dimensoes = {
     "Dimensão Estratégica / Pilar": [
         "🧠 Experiência do Cliente (CSAT)",
         "⚡ Eficiência Operacional (TMA + Improc.)",
-        "📋 Disciplina e Qualidade (Monit. + Escala + Pausas)",
-        "∑ TOTAL"
+        "📋 Disciplina e Qualidade (Monit. + Escala + Pausas)"
     ],
-    "RE": [resumo_dimensoes["RE"][0], resumo_dimensoes["RE"][1], resumo_dimensoes["RE"][2], "100%"],
-    "MONO": [resumo_dimensoes["MONO"][0], resumo_dimensoes["MONO"][1], resumo_dimensoes["MONO"][2], "100%"],
-    "MULTI": [resumo_dimensoes["MULTI"][0], resumo_dimensoes["MULTI"][1], resumo_dimensoes["MULTI"][2], "100%"],
-    "CSF Interno": [resumo_dimensoes["CSF Interno"][0], resumo_dimensoes["CSF Interno"][1], resumo_dimensoes["CSF Interno"][2], "100%"],
-    "CSF Ajuda": [resumo_dimensoes["CSF Ajuda"][0], resumo_dimensoes["CSF Ajuda"][1], resumo_dimensoes["CSF Ajuda"][2], "100%"],
-    "CSF Quality": [resumo_dimensoes["CSF Quality"][0], resumo_dimensoes["CSF Quality"][1], resumo_dimensoes["CSF Quality"][2], "100%"]
+    "RE": [resumo_dimensoes["RE"][0], resumo_dimensoes["RE"][1], resumo_dimensoes["RE"][2]],
+    "MONO": [resumo_dimensoes["MONO"][0], resumo_dimensoes["MONO"][1], resumo_dimensoes["MONO"][2]],
+    "MULTI": [resumo_dimensoes["MULTI"][0], resumo_dimensoes["MULTI"][1], resumo_dimensoes["MULTI"][2]],
+    "CSF Interno": [resumo_dimensoes["CSF Interno"][0], resumo_dimensoes["CSF Interno"][1], resumo_dimensoes["CSF Interno"][2]],
+    "CSF Ajuda": [resumo_dimensoes["CSF Ajuda"][0], resumo_dimensoes["CSF Ajuda"][1], resumo_dimensoes["CSF Ajuda"][2]],
+    "CSF Quality": [resumo_dimensoes["CSF Quality"][0], resumo_dimensoes["CSF Quality"][1], resumo_dimensoes["CSF Quality"][2]]
 }
 
 colunas_dimensoes_exibicao = ["Dimensão Estratégica / Pilar"] + clusters_filtrados
@@ -184,6 +170,7 @@ df_dimensoes = pd.DataFrame(dados_soma_dimensoes)[colunas_dimensoes_exibicao]
 
 st.dataframe(df_dimensoes, use_container_width=True, hide_index=True)
 st.divider()
+
 
 # ==============================================================================
 # GRÁFICO COMPARATIVO EXECUTIVO COM RÓTULOS DINÂMICOS
@@ -227,7 +214,7 @@ fig.update_layout(
     barmode='stack',
     plot_bgcolor='rgba(0,0,0,0)',
     paper_bgcolor='rgba(0,0,0,0)',
-    height=380,
+    height=400,
     margin=dict(l=20, r=20, t=10, b=10),
     legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5),
     yaxis=dict(title="Distribuição de Peso (%)", gridcolor="#e2e8f0")
