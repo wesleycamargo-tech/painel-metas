@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilização Executiva Premium + Correção de Espaço no Topo
+# Estilização Executiva Premium + Correção de Espaço + CENTRALIZAÇÃO TOTAL DAS TABELAS
 st.markdown("""
     <style>
     /* Remove o espaço em branco gigante no topo da página */
@@ -19,6 +19,15 @@ st.markdown("""
         padding-bottom: 0rem !important;
     }
     .main { background-color: #f8f9fa; }
+    
+    /* Força a centralização de todo o texto dentro das tabelas (cabeçalho e células) */
+    div[data-testid="stDataFrame"] table th, 
+    div[data-testid="stDataFrame"] table td,
+    div[data-testid="stDataFrame"] [role="gridcell"],
+    div[data-testid="stDataFrame"] [role="columnheader"] {
+        text-align: center !important;
+        justify-content: center !important;
+    }
     
     /* Títulos de seções elegantes */
     .macro-title {
@@ -122,7 +131,6 @@ else:
 # ==============================================================================
 st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
 
-# Lista completa de indicadores revisada e limpa fixada nas linhas
 indicadores_linhas = [
     "💻 CSAT",
     "⏱️ TMA / TMT",
@@ -133,7 +141,6 @@ indicadores_linhas = [
     "🧠 Treinamento"
 ]
 
-# Construindo o dicionário com tuplas para criar as subcolunas hierárquicas (MultiIndex)
 dados_multi_coluna = {
     ("Métrica / Indicador", ""): indicadores_linhas,
     
@@ -156,11 +163,9 @@ dados_multi_coluna = {
     ("CSF Quality", "Peso"): ["0%", "30%", "10%", "45%", "0%", "15%", "-"]
 }
 
-# Criando o DataFrame Multi-Nível
 df_matriz_complexa = pd.DataFrame(dados_multi_coluna)
 df_matriz_complexa.columns = pd.MultiIndex.from_tuples(df_matriz_complexa.columns)
 
-# Regra de Filtragem dinâmica das Colunas Principais (Clusters)
 colunas_manter = [("Métrica / Indicador", "")]
 for c in clusters_filtrados:
     colunas_manter.append((c, "Meta"))
@@ -168,26 +173,18 @@ for c in clusters_filtrados:
 
 df_matriz_exibicao = df_matriz_complexa[colunas_manter]
 
-# Mapeamento para forçar a CENTRALIZAÇÃO de dados e cabeçalhos de todas as colunas dinâmicas
-config_colunas = {
-    ("Métrica / Indicador", ""): st.column_config.Column(alignment="center")
-}
-for c in clusters_filtrados:
-    config_colunas[(c, "Meta")] = st.column_config.Column(alignment="center")
-    config_colunas[(c, "Peso")] = st.column_config.Column(alignment="center")
-
-# Renderizando com suporte nativo a cabeçalhos multinível e alinhamento centralizado
-st.dataframe(df_matriz_exibicao, use_container_width=True, hide_index=True, column_config=config_colunas)
+# Renderização limpa (o alinhamento é feito via CSS global definido no topo do código)
+st.dataframe(df_matriz_exibicao, use_container_width=True, hide_index=True)
 
 
 # ==============================================================================
-# QUADRO 2: RESUMO INVERTIDO (CENTRALIZADO)
+# QUADRO 2: RESUMO INVERTIDO
 # ==============================================================================
 st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
 
 dados_soma_dimensoes = {
     "Dimensão Estratégica / Pilar": [
-        "🧠 Experiência do Cliente (CSAT)",
+        "🧠 Experiência do Cliente",
         "⚡ Eficiência Operacional (TMA + Improc.)",
         "📋 Disciplina e Qualidade (Monit. + Escala + Pausas)"
     ],
@@ -202,13 +199,7 @@ dados_soma_dimensoes = {
 colunas_dimensoes_exibicao = ["Dimensão Estratégica / Pilar"] + clusters_filtrados
 df_dimensoes = pd.DataFrame(dados_soma_dimensoes)[colunas_dimensoes_exibicao]
 
-config_resumo = {
-    "Dimensão Estratégica / Pilar": st.column_config.Column(alignment="center")
-}
-for c in clusters_filtrados:
-    config_resumo[c] = st.column_config.Column(alignment="center")
-
-st.dataframe(df_dimensoes, use_container_width=True, hide_index=True, column_config=config_resumo)
+st.dataframe(df_dimensoes, use_container_width=True, hide_index=True)
 st.divider()
 
 
@@ -225,7 +216,7 @@ fig = go.Figure()
 
 fig.add_trace(go.Bar(
     x=clusters_filtrados, y=valores_csat, 
-    name='🧠 Experiência',  # Sigla CSAT removida da legenda
+    name='🧠 Experiência', 
     marker_color='#1e3a8a',
     text=[f"{v}%" if v > 0 else "" for v in valores_csat],
     textposition='inside',
