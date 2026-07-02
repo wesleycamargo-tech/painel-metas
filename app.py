@@ -62,7 +62,7 @@ with col3:
 with col4:
     st.markdown('<div class="quadrant-box" style="background-color: #dc3545;">Q4 - Resgatando a essência<br>&lt; 80%</div>', unsafe_allow_html=True)
 
-st.space(2)
+st.write("")
 
 # --- SEÇÃO 2: MATRIZ DE METAS DINÂMICA ---
 data_metas = {
