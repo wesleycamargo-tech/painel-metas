@@ -36,7 +36,7 @@ st.sidebar.markdown("---")
 
 competencia = st.sidebar.selectbox(
     "Selecione a Competência:", 
-    ["Julho / 2026", "Junho / 2026", "Maio / 2026"]
+    ["Julho / 2026", "Junho / 2026"]
 )
 
 st.sidebar.markdown("---")
@@ -46,7 +46,7 @@ filtro_macro = st.sidebar.radio(
     ["Ver Todas as Clusters", "RE", "CSF (Interno, Ajuda, Quality)"]
 )
 
-# Definição das colunas com base nas abas da imagem
+# Definição dos clusters alvo
 clusters_totais = ["RE", "CSF INTERNO", "CSF AJUDA", "CSF QUALITY"]
 if filtro_macro == "RE":
     clusters_filtrados = ["RE"]
@@ -65,116 +65,156 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- LEITURA DO FICHEIRO ENVIADO PARA O GITHUB ---
+# --- PROCESSAMENTO INTELIGENTE DO CSV EMPILHADO ---
 try:
-    # Lendo o arquivo local que você carregou no GitHub
-    df_raw = pd.read_csv("metas.csv")
+    # 1. Lê o arquivo único do GitHub
+    df_raw = pd.read_csv("metas.csv", header=None)
     
-    # Tratamento para alinhar cabeçalhos limpos
-    df_raw.columns = [str(c).strip().upper() for c in df_raw.columns]
+    # Identifica o mês termo de busca
+    mes_procurado = "julho 2026" if "Julho" in competencia else "junho 2026"
     
-    st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
-    
-    # Construção da tabela dupla organizada por Meta | Peso
-    html_tabela = '<table class="table-executiva"><thead><tr><th rowspan="2">Métrica / Indicador</th>'
-    for cluster in clusters_filtrados:
-        html_tabela += f'<th colspan="2">{cluster}</th>'
-    html_tabela += '</tr><tr>'
-    for cluster in clusters_filtrados:
-        html_tabela += '<th>Meta</th><th>Peso</th>'
-    html_tabela += '</tr></thead><tbody>'
+    # 2. Encontra em qual linha vertical começa o bloco do mês selecionado
+    linha_inicio = None
+    for idx, row in df_raw.iterrows():
+        val_celula = str(row.iloc[0]).strip().lower()
+        if mes_procurado in val_celula:
+            linha_inicio = idx
+            break
 
-    # Dicionário estático para os pesos gráficos conforme as regras de negócio
-    grafico_pesos = {"RE": [35, 40, 25], "MONO": [35, 40, 25], "MULTI": [30, 40, 30], "CSF INTERNO": [0, 30, 70], "CSF AJUDA": [0, 30, 70], "CSF QUALITY": [0, 40, 60]}
-    resumo_dimensoes = {"RE": ["35%", "40%", "25%"], "MONO": ["35%", "40%", "25%"], "MULTI": ["30%", "40%", "30%"], "CSF INTERNO": ["0%", "30%", "70%"], "CSF AJUDA": ["0%", "30%", "70%"], "CSF QUALITY": ["0%", "40%", "60%"]}
-
-    # Mapeamento de Ícones com base na imagem real
-    icones = {"CSAT": "💻 ", "TMA": "⏱️ ", "IMPROCEDÊNCIA DEVIDA": "🚫 ", "NOTA DE MONITORIA": "🎧 ", "ADERÊNCIA A ESCALA": "📅 ", "EVASÃO DE PAUSAS": "🛑 "}
-
-    # Varre as linhas do arquivo importado
-    for _, row in df_raw.iterrows():
-        if pd.isna(row.iloc[0]):
-            continue
-            
-        indicador_nome = str(row.iloc[0]).strip()
+    if linha_inicio is None:
+        st.error(f"Não encontramos o bloco '{mes_procurado}' dentro do arquivo metas.csv.")
+    else:
+        # 3. Recorta apenas as linhas pertencentes àquele mês (até encontrar o próximo mês ou fim do arquivo)
+        linhas_bloco = []
+        cabeçalho = None
         
-        # Filtra linhas vazias ou de cabeçalho repetido do Excel
-        if indicador_nome.upper() in ["NAN", "", "METAS", "INDICADOR"]:
-            continue
+        for idx in range(linha_inicio + 1, len(df_raw)):
+            row = df_raw.iloc[idx]
+            primeira_celula = str(row.iloc[0]).strip()
             
-        indicador_upper = indicador_nome.upper()
-        icone = "🔹 "
-        for k, v in icones.items():
-            if k in indicador_upper:
-                icone = v
+            # Se encontrar a marcação do próximo mês (ex: junho 2026 vindo de julho), para de ler
+            if "2026" in primeira_celula and primeira_celula.lower() != mes_procurado:
+                break
+            if "↓ HISTÓRICO" in primeira_celula.upper():
                 break
                 
-        html_tabela += f'<tr><td style="text-align: left !important; padding-left: 15px;"><b>{icone}{indicador_nome}</b></td>'
-        
-        for cluster in clusters_filtrados:
-            meta_val = str(row.get(cluster, "-")).strip()
-            
-            # Recuperação automática de pesos com base no indicador
-            peso_val = "-"
-            if cluster in resumo_dimensoes:
-                if "CSAT" in indicador_upper: peso_val = "35%" if cluster == "RE" else "0%"
-                elif "TMA" in indicador_upper: peso_val = "30%"
-                elif "IMPROCEDÊNCIA" in indicador_upper: peso_val = "10%" if cluster != "CSF AJUDA" else "30%"
-                elif "MONITORIA" in indicador_upper: peso_val = "25%" if cluster == "RE" else ("45%" if cluster == "CSF INTERNO" else "50%")
-            
-            if meta_val in ["-", "nan", "*** Não seguirá com o indicador", "Sem meta"]:
-                meta_val = "-"
-                celula_meta = f'<td class="meta-muted-gray">{meta_val}</td>'
-            elif "TMA" in indicador_upper:
-                celula_meta = f'<td class="meta-tma-gray">{meta_val}</td>'
-            else:
-                celula_meta = f'<td>{meta_val}</td>'
+            # Define dinamicamente o cabeçalho (a linha que contém RE, CSF INTERNO...)
+            if "METAS -" in primeira_celula.upper() or "METAS" in primeira_celula.upper():
+                cabeçalho = [str(c).strip().upper() for c in row]
+                continue
                 
-            html_tabela += celula_meta + f'<td>{peso_val}</td>'
-        html_tabela += '</tr>'
+            if cabeçalho and primeira_celula != "nan" and primeira_celula != "":
+                linhas_bloco.append(row)
+
+        # Reconstrói o mini dataframe do mês selecionado
+        df_mes = pd.DataFrame(linhas_bloco)
+        df_mes.columns = cabeçalho
+
+        # ==============================================================================
+        # QUADRO 1: MATRIZ DE INDICADORES (CONSTRUÍDA LIVE)
+        # ==============================================================================
+        st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
         
-    html_tabela += '</tbody></table>'
-    st.html(html_tabela)
+        html_tabela = '<table class="table-executiva"><thead><tr><th rowspan="2">Métrica / Indicador</th>'
+        for cluster in clusters_filtrados:
+            html_tabela += f'<th colspan="2">{cluster}</th>'
+        html_tabela += '</tr><tr>'
+        for cluster in clusters_filtrados:
+            html_tabela += '<th>Meta</th><th>Peso</th>'
+        html_tabela += '</tr></thead><tbody>'
 
-    # ==============================================================================
-    # QUADRO 2: RESUMO INVERTIDO
-    # ==============================================================================
-    st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
-    html_resumo = '<table class="table-executiva"><thead><tr><th>Dimensão Estratégica / Pilar</th>'
-    for cluster in clusters_filtrados:
-        html_resumo += f'<th>{cluster}</th>'
-    html_resumo += '</tr></thead><tbody>'
+        # Definição estática das regras de negócio de Pesos por mês
+        if "Julho" in competencia:
+            grafico_pesos = {"RE": [35, 40, 25], "CSF INTERNO": [0, 30, 70], "CSF AJUDA": [0, 30, 70], "CSF QUALITY": [0, 40, 60]}
+            resumo_dimensoes = {"RE": ["35%", "40%", "25%"], "CSF INTERNO": ["0%", "30%", "70%"], "CSF AJUDA": ["0%", "30%", "70%"], "CSF QUALITY": ["0%", "40%", "60%"]}
+        else:
+            grafico_pesos = {"RE": [35, 45, 20], "CSF INTERNO": [0, 35, 65], "CSF AJUDA": [0, 25, 75], "CSF QUALITY": [0, 45, 55]}
+            resumo_dimensoes = {"RE": ["35%", "45%", "20%"], "CSF INTERNO": ["0%", "35%", "65%"], "CSF AJUDA": ["0%", "25%", "75%"], "CSF QUALITY": ["0%", "45%", "55%"]}
 
-    dados_resumo = [
-        ("🧠 Experiência do Cliente", [resumo_dimensoes.get(c, ["-"])[0] for c in clusters_filtrados]),
-        ("⚡ Eficiência Operacional (TMA + Improc.)", [resumo_dimensoes.get(c, ["-"])[1] for c in clusters_filtrados]),
-        ("📋 Disciplina e Qualidade (Monit. + Escala + Pausas)", [resumo_dimensoes.get(c, ["-"])[2] for c in clusters_filtrados])
-    ]
-    for pilar, valores in dados_resumo:
-        html_resumo += f'<tr><td style="text-align: left !important; font-weight: bold;">{pilar}</td>'
-        for val in valores:
-            if val in ["0%", "-", "0"]: html_resumo += f'<td class="meta-muted-gray">{val}</td>'
-            else: html_resumo += f'<td>{val}</td>'
-        html_resumo += '</tr>'
-    html_resumo += '</tbody></table>'
-    st.html(html_resumo)
-    st.divider()
+        icones = {"CSAT": "💻 ", "TMA": "⏱️ ", "IMPROCEDÊNCIA": "🚫 ", "MONITORIA": "🎧 ", "ADERÊNCIA": "📅 ", "EVASÃO": "🛑 "}
 
-    # ==============================================================================
-    # GRÁFICO COMPARATIVO
-    # ==============================================================================
-    st.subheader("📊 Campo Comparativo: Visão Gráfica da Arquitetura de Pesos")
-    valores_csat = [grafico_pesos.get(c, [0])[0] for c in clusters_filtrados]
-    valores_eficiencia = [grafico_pesos.get(c, [0])[1] for c in clusters_filtrados]
-    valores_disciplina = [grafico_pesos.get(c, [0])[2] for c in clusters_filtrados]
+        # Preenche a tabela dinamicamente com as linhas capturadas
+        for _, row in df_mes.iterrows():
+            indicador_nome = str(row.iloc[0]).strip()
+            indicador_upper = indicador_nome.upper()
+            
+            if "PONDERAÇÃO" in indicador_upper or "FAIXAS" in indicador_upper or indicador_nome == "":
+                continue
+                
+            icone = "🔹 "
+            for k, v in icones.items():
+                if k in indicador_upper:
+                    icone = v
+                    break
+                    
+            html_tabela += f'<tr><td style="text-align: left !important; padding-left: 15px;"><b>{icone}{indicador_nome}</b></td>'
+            
+            for cluster in clusters_filtrados:
+                # Busca o valor na coluna correspondente
+                meta_val = str(row.get(cluster, "-")).strip()
+                
+                # Atribuição fixa de pesos com base no indicador para o resumo
+                peso_val = "-"
+                if cluster in resumo_dimensoes:
+                    if "CSAT" in indicador_upper: peso_val = "35%" if cluster == "RE" else "0%"
+                    elif "TMA" in indicador_upper: peso_val = "30%"
+                    elif "IMPROCEDÊNCIA" in indicador_upper: peso_val = "10%" if cluster != "CSF AJUDA" else "30%"
+                    elif "MONITORIA" in indicador_upper: peso_val = "25%" if cluster == "RE" else ("45%" if cluster == "CSF INTERNO" else "50%")
+                    elif "ADERÊNCIA" in indicador_upper: peso_val = "25%" if cluster == "CSF INTERNO" else ("20%" if cluster == "CSF AJUDA" else "0%")
+                    elif "EVASÃO" in indicador_upper: peso_val = "15%" if cluster == "CSF QUALITY" else "0%"
 
-    fig = go.Figure()
-    fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_csat, name='🧠 Experiência', marker_color='#1e3a8a', text=[f"{v}%" if v > 0 else "" for v in valores_csat], textposition='inside', textfont=dict(color='white', weight='bold')))
-    fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_eficiencia, name='⚡ Eficiência', marker_color='#475569', text=[f"{v}%" if v > 0 else "" for v in valores_eficiencia], textposition='inside', textfont=dict(color='white', weight='bold')))
-    fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_disciplina, name='📋 Disciplina e Qualidade', marker_color='#0f766e', text=[f"{v}%" if v > 0 else "" for v in valores_disciplina], textposition='inside', textfont=dict(color='white', weight='bold')))
-    fig.update_layout(barmode='stack', plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=400, margin=dict(l=20, r=20, t=10, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5), yaxis=dict(title="Distribuição de Peso (%)", gridcolor="#e2e8f0"))
-    st.plotly_chart(fig, use_container_width=True)
+                if meta_val in ["-", "nan", "*** Não seguirá com o indicador", "Sem meta"] or meta_val == "":
+                    meta_val = "-"
+                    celula_meta = f'<td class="meta-muted-gray">{meta_val}</td>'
+                elif "TMA" in indicador_upper:
+                    celula_meta = f'<td class="meta-tma-gray">{meta_val}</td>'
+                else:
+                    celula_meta = f'<td>{meta_val}</td>'
+                    
+                html_tabela += celula_meta + f'<td>{peso_val}</td>'
+            html_tabela += '</tr>'
+            
+        html_tabela += '</tbody></table>'
+        st.html(html_tabela)
+
+        # ==============================================================================
+        # QUADRO 2: RESUMO INVERTIDO
+        # ==============================================================================
+        st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
+        html_resumo = '<table class="table-executiva"><thead><tr><th>Dimensão Estratégica / Pilar</th>'
+        for cluster in clusters_filtrados:
+            html_resumo += f'<th>{cluster}</th>'
+        html_resumo += '</tr></thead><tbody>'
+
+        dados_resumo = [
+            ("🧠 Experiência do Cliente", [resumo_dimensoes.get(c, ["-"])[0] for c in clusters_filtrados]),
+            ("⚡ Eficiência Operacional (TMA + Improc.)", [resumo_dimensoes.get(c, ["-"])[1] for c in clusters_filtrados]),
+            ("📋 Disciplina e Qualidade (Monit. + Escala + Pausas)", [resumo_dimensoes.get(c, ["-"])[2] for c in clusters_filtrados])
+        ]
+        for pilar, valores in dados_resumo:
+            html_resumo += f'<tr><td style="text-align: left !important; font-weight: bold;">{pilar}</td>'
+            for val in valores:
+                if val in ["0%", "-", "0"]: html_resumo += f'<td class="meta-muted-gray">{val}</td>'
+                else: html_resumo += f'<td>{val}</td>'
+            html_resumo += '</tr>'
+        html_resumo += '</tbody></table>'
+        st.html(html_resumo)
+        st.divider()
+
+        # ==============================================================================
+        # GRÁFICO COMPARATIVO
+        # ==============================================================================
+        st.subheader("📊 Campo Comparativo: Visão Gráfica da Arquitetura de Pesos")
+        valores_csat = [grafico_pesos.get(c, [0])[0] for c in clusters_filtrados]
+        valores_eficiencia = [grafico_pesos.get(c, [0])[1] for c in clusters_filtrados]
+        valores_disciplina = [grafico_pesos[c][2] for c in clusters_filtrados]
+
+        fig = go.Figure()
+        fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_csat, name='🧠 Experiência', marker_color='#1e3a8a', text=[f"{v}%" if v > 0 else "" for v in valores_csat], textposition='inside', textfont=dict(color='white', weight='bold')))
+        fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_eficiencia, name='⚡ Eficiência', marker_color='#475569', text=[f"{v}%" if v > 0 else "" for v in valores_eficiencia], textposition='inside', textfont=dict(color='white', weight='bold')))
+        fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_disciplina, name='📋 Disciplina e Qualidade', marker_color='#0f766e', text=[f"{v}%" if v > 0 else "" for v in valores_disciplina], textposition='inside', textfont=dict(color='white', weight='bold')))
+        fig.update_layout(barmode='stack', plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=400, margin=dict(l=20, r=20, t=10, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5), yaxis=dict(title="Distribuição de Peso (%)", gridcolor="#e2e8f0"))
+        st.plotly_chart(fig, use_container_width=True)
 
 except Exception as e:
-    st.warning("Arquivo metas.csv não foi encontrado no seu GitHub.")
-    st.info(f"Aguardando upload do arquivo csv. Erro: {e}")
+    st.error(f"Erro ao processar o arquivo metas.csv: {e}")
