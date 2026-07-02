@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilização Executiva Avançada via CSS + Centralização e Cores Customizadas
+# Estilização Executiva Premium + Correção de Espaço no Topo
 st.markdown("""
     <style>
     /* Remove o espaço em branco gigante no topo da página */
@@ -44,33 +44,43 @@ st.markdown("""
         color: #cbd5e1 !important;
         font-weight: 500;
     }
-    </style>
-""", unsafe_allow_html=True)
 
-# CSS Injetado diretamente para Forçar Centralização Absoluta, Traços em Cinza e Linha do TMA em Cinza
-st.html("""
-    <style>
-    /* Centraliza os cabeçalhos das tabelas */
-    .stDataFrame table th, .stDataFrame [role="columnheader"] {
-        text-align: center !important;
-        justify-content: center !important;
+    /* Estilização e Centralização Absoluta das Tabelas HTML */
+    .table-executiva {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: sans-serif;
+        font-size: 14px;
+        margin-bottom: 20px;
+        background-color: white;
+        border-radius: 4px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
-    /* Centraliza todas as células das tabelas */
-    .stDataFrame table td, .stDataFrame [role="gridcell"] {
+    .table-executiva th {
+        background-color: #f1f5f9;
+        color: #1e293b;
+        font-weight: 600;
+        padding: 10px;
+        border: 1px solid #e2e8f0;
         text-align: center !important;
-        justify-content: center !important;
     }
-    /* Estiliza células com traços "-" ou texto "Inativo" para ficarem em cinza claro */
-    .stDataFrame td:contains("-"), .stDataFrame td:contains("Inativo"), .stDataFrame td:contains("Sem Meta") {
+    .table-executiva td {
+        padding: 12px 10px;
+        border: 1px solid #e2e8f0;
+        text-align: center !important;
+        color: #0f172a;
+    }
+    /* Estilo para itens inativos ou sem meta (cinza claro) */
+    .text-muted-gray {
         color: #94a3b8 !important;
-        font-weight: normal !important;
     }
-    /* Alvo específico para a linha do TMA: deixa todo o texto cinza */
-    .stDataFrame tr:nth-child(2) td {
+    /* Estilo para a linha do TMA (texto cinza) */
+    .linha-tma td {
         color: #64748b !important;
     }
     </style>
-""")
+""", unsafe_allow_html=True)
 
 # --- SIDEBAR: Filtros Estratégicos Executivos ---
 st.sidebar.markdown("## 📊 Filtros Corporativos")
@@ -141,78 +151,98 @@ else:
         "CSF Interno": ["0%", "40%", "60%"], "CSF Ajuda": ["0%", "40%", "60%"], "CSF Quality": ["0%", "50%", "50%"]
     }
 
+# Função auxiliar para formatar células vazias/inativas em cinza
+def fmt(texto):
+    if texto in ["-", "Inativo", "Sem Meta", "0%"]:
+        return f'<span class="text-muted-gray">{texto}</span>'
+    return texto
+
 # ==============================================================================
-# QUADRO 1: MATRIZ DE INDICADORES (COLUNAS DUPLAS: CLUSTER -> META | PESO)
+# QUADRO 1: MATRIZ DE INDICADORES (CONSTRUÇÃO DO HTML DINÂMICO PARA SUPORTAR OS AJUSTES)
 # ==============================================================================
 st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
 
-indicadores_linhas = [
-    "💻 CSAT",
-    "⏱️ TMA / TMT",
-    "🚫 Improcedência Devida",
-    "🎧 Nota de Monitoria",
-    "📅 Aderência à Escala",
-    "🛑 Evasão de Pausas",
-    "🧠 Treinamento"
-]
-
-dados_multi_coluna = {
-    ("Métrica / Indicador", ""): indicadores_linhas,
-    
-    ("RE", "Meta"): ["84.0% (Q1: 91%)", "Conforme dim.", "≤ 2 Abs", "90% (Q1: 95%)", "-", "6 a 10 Abs", "95%"],
-    ("RE", "Peso"): ["35%", "30%", "10%", "25%", "-", "-", "-"],
-    
-    ("MONO", "Meta"): [meta_csat_mono, "Conforme dim.", "≤ 2 Abs", "90% (Q1: 95%)", "-", "≤ 5 Abs", "95%"],
-    ("MONO", "Peso"): [peso_csat_mono, "30%", "10%", "25%", "-", "-", "-"],
-    
-    ("MULTI", "Meta"): ["Fone: 90% / Dig: 80%", "Conforme dim.", "≤ 2 Abs", "90% (Q1: 95%)", "88% (Q1: 93.5%)", "-", "95%"],
-    ("MULTI", "Peso"): [peso_csat_multi, "30%", "10%", "15%", "15%", "-", "-"],
-    
-    ("CSF Interno", "Meta"): ["Inativo", "Conforme dim.", "-", "75% (Q1: 83%)", "88% (Q1: 93.5%)", "-", "-"],
-    ("CSF Interno", "Peso"): ["-", "30%", "-", "45%", "25%", "-", "-"],
-    
-    ("CSF Ajuda", "Meta"): ["Inativo", "Sem Meta", "1 Abs", "75% (Q1: 83%)", "88% (Q1: 93.5%)", "-", "-"],
-    ("CSF Ajuda", "Peso"): ["-", "-", "30%", "50%", "20%", "-", "-"],
-    
-    ("CSF Quality", "Meta"): ["Inativo", "Conforme dim.", "1 Abs", "75% (Q1: 83%)", "-", "15%", "-"],
-    ("CSF Quality", "Peso"): ["-", "30%", "10%", "45%", "-", "15%", "-"]
+# Base de dados estruturada
+dados_base = {
+    "CSAT": {
+        "RE": ("84.0% (Q1: 91%)", "35%"), "MONO": (meta_csat_mono, peso_csat_mono), "MULTI": ("Fone: 90% / Dig: 80%", peso_csat_multi),
+        "CSF Interno": ("Inativo", "-"), "CSF Ajuda": ("Inativo", "-"), "CSF Quality": ("Inativo", "-")
+    },
+    "TMA / TMT": {
+        "RE": ("Conforme dim.", "30%"), "MONO": ("Conforme dim.", "30%"), "MULTI": ("Conforme dim.", "30%"),
+        "CSF Interno": ("Conforme dim.", "30%"), "CSF Ajuda": ("Sem Meta", "-"), "CSF Quality": ("Conforme dim.", "30%")
+    },
+    "Improcedência Devida": {
+        "RE": ("≤ 2 Abs", "10%"), "MONO": ("≤ 2 Abs", "10%"), "MULTI": ("≤ 2 Abs", "10%"),
+        "CSF Interno": ("-", "-"), "CSF Ajuda": ("1 Abs", "30%"), "CSF Quality": ("1 Abs", "10%")
+    },
+    "Nota de Monitoria": {
+        "RE": ("90% (Q1: 95%)", "25%"), "MONO": ("90% (Q1: 95%)", "25%"), "MULTI": ("90% (Q1: 95%)", "15%"),
+        "CSF Interno": ("75% (Q1: 83%)", "45%"), "CSF Ajuda": ("75% (Q1: 83%)", "50%"), "CSF Quality": ("75% (Q1: 83%)", "45%")
+    },
+    "Aderência à Escala": {
+        "RE": ("-", "-"), "MONO": ("-", "-"), "MULTI": ("88% (Q1: 93.5%)", "15%"),
+        "CSF Interno": ("88% (Q1: 93.5%)", "25%"), "CSF Ajuda": ("88% (Q1: 93.5%)", "20%"), "CSF Quality": ("-", "-")
+    },
+    "Evasão de Pausas": {
+        "RE": ("6 a 10 Abs", "-"), "MONO": ("≤ 5 Abs", "-"), "MULTI": ("-", "-"),
+        "CSF Interno": ("-", "-"), "CSF Ajuda": ("-", "-"), "CSF Quality": ("15%", "15%")
+    },
+    "Treinamento": {
+        "RE": ("95%", "-"), "MONO": ("95%", "-"), "MULTI": ("95%", "-"),
+        "CSF Interno": ("-", "-"), "CSF Ajuda": ("-", "-"), "CSF Quality": ("-", "-")
+    }
 }
 
-df_matriz_complexa = pd.DataFrame(dados_multi_coluna)
-df_matriz_complexa.columns = pd.MultiIndex.from_tuples(df_matriz_complexa.columns)
+# Criando o cabeçalho duplo em HTML puro baseado no filtro da sidebar
+html_tabela = '<table class="table-executiva"><thead>'
+html_tabela += '<tr><th rowspan="2">Métrica / Indicador</th>'
+for cluster in clusters_filtrados:
+    html_tabela += f'<th colspan="2">{cluster}</th>'
+html_tabela += '</tr><tr>'
+for cluster in clusters_filtrados:
+    html_tabela += '<th>Meta</th><th>Peso</th>'
+html_tabela += '</tr></thead><tbody>'
 
-colunas_manter = [("Métrica / Indicador", "")]
-for c in clusters_filtrados:
-    colunas_manter.append((c, "Meta"))
-    colunas_manter.append((c, "Peso"))
+# Preenchendo as linhas e aplicando as classes de estilo cinza
+icones = {"CSAT": "💻 ", "TMA / TMT": "⏱️ ", "Improcedência Devida": "🚫 ", "Nota de Monitoria": "🎧 ", "Aderência à Escala": "📅 ", "Evasão de Pausas": "🛑 ", "Treinamento": "🧠 "}
 
-df_matriz_exibicao = df_matriz_complexa[colunas_manter]
-st.dataframe(df_matriz_exibicao, use_container_width=True, hide_index=True)
+for indicador, valores in dados_base.items():
+    classe_linha = ' class="linha-tma"' if indicador == "TMA / TMT" else ''
+    html_tabela += f'<tr{classe_linha}><td><b>{icones[indicador]}{indicador}</b></td>'
+    for cluster in clusters_filtrados:
+        meta_val, peso_val = valores[cluster]
+        html_tabela += f'<td>{fmt(meta_val)}</td><td>{fmt(peso_val)}</td>'
+    html_tabela += '</tr>'
+
+html_tabela += '</tbody></table>'
+st.html(html_tabela)
 
 
 # ==============================================================================
-# QUADRO 2: RESUMO INVERTIDO
+# QUADRO 2: RESUMO INVERTIDO (HTML PURO CENTRALIZADO)
 # ==============================================================================
 st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
 
-dados_soma_dimensoes = {
-    "Dimensão Estratégica / Pilar": [
-        "🧠 Experiência do Cliente",
-        "⚡ Eficiência Operacional (TMA + Improc.)",
-        "📋 Disciplina e Qualidade (Monit. + Escala + Pausas)"
-    ],
-    "RE": [resumo_dimensoes["RE"][0], resumo_dimensoes["RE"][1], resumo_dimensoes["RE"][2]],
-    "MONO": [resumo_dimensoes["MONO"][0], resumo_dimensoes["MONO"][1], resumo_dimensoes["MONO"][2]],
-    "MULTI": [resumo_dimensoes["MULTI"][0], resumo_dimensoes["MULTI"][1], resumo_dimensoes["MULTI"][2]],
-    "CSF Interno": [resumo_dimensoes["CSF Interno"][0], resumo_dimensoes["CSF Interno"][1], resumo_dimensoes["CSF Interno"][2]],
-    "CSF Ajuda": [resumo_dimensoes["CSF Ajuda"][0], resumo_dimensoes["CSF Ajuda"][1], resumo_dimensoes["CSF Ajuda"][2]],
-    "CSF Quality": [resumo_dimensoes["CSF Quality"][0], resumo_dimensoes["CSF Quality"][1], resumo_dimensoes["CSF Quality"][2]]
-}
+dados_resumo = [
+    ("🧠 Experiência do Cliente", [resumo_dimensoes[c][0] for c in clusters_filtrados]),
+    ("⚡ Eficiência Operacional (TMA + Improc.)", [resumo_dimensoes[c][1] for c in clusters_filtrados]),
+    ("📋 Disciplina e Qualidade (Monit. + Escala + Pausas)", [resumo_dimensoes[c][2] for c in clusters_filtrados])
+]
 
-colunas_dimensoes_exibicao = ["Dimensão Estratégica / Pilar"] + clusters_filtrados
-df_dimensoes = pd.DataFrame(dados_soma_dimensoes)[colunas_dimensoes_exibicao]
+html_resumo = '<table class="table-executiva"><thead><tr><th>Dimensão Estratégica / Pilar</th>'
+for cluster in clusters_filtrados:
+    html_resumo += f'<th>{cluster}</th>'
+html_resumo += '</tr></thead><tbody>'
 
-st.dataframe(df_dimensoes, use_container_width=True, hide_index=True)
+for pilar, valores in dados_resumo:
+    html_resumo += f'<tr><td style="text-align: left !important; font-weight: bold;">{pilar}</td>'
+    for val in valores:
+        html_resumo += f'<td>{fmt(val)}</td>'
+    html_resumo += '</tr>'
+
+html_resumo += '</tbody></table>'
+st.html(html_resumo)
 st.divider()
 
 
