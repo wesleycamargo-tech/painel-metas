@@ -1,4 +1,1 @@
-streamlit
-plotly
-streamlit-gsheets
-google-auth
+
