@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 
 # Configuração da página Lumia / Streamlit
 st.set_page_config(
@@ -25,13 +24,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- SIDEBAR: Filtros e Navegação ---
+# --- SIDEBAR: Filtros ---
 st.sidebar.title("Filtros Estratégicos")
 competencia = st.sidebar.selectbox("Competência", ["Julho / 2026", "Junho / 2026", "Maio / 2026"])
 cluster_selecionado = st.sidebar.multiselect(
     "Filtrar por Cluster", 
     ["RE", "MONO", "MULTI", "CSF Interno", "CSF Ajuda", "CSF Quality"],
-    default=["RE", "MONO", "MULTI"]
+    default=["RE", "MONO", "MULTI", "CSF Interno", "CSF Ajuda", "CSF Quality"]
 )
 
 # --- TÍTULO PRINCIPAL ---
@@ -40,7 +39,7 @@ st.caption(f"Visualização dinâmica de indicadores e metas operacionais • Co
 st.divider()
 
 # --- SEÇÃO 1: STATUS E QUADRANTES ---
-st.subheader("🎯 Metas e Enquadramento de Performance")
+st.subheader("🎯 Enquadramento de Performance")
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
@@ -52,7 +51,11 @@ with col3:
 with col4:
     st.markdown('<div class="quadrant-box" style="background-color: #dc3545;">Q4 - Resgatando a essência<br>&lt; 80%</div>', unsafe_allow_html=True)
 
+st.divider()
+
 # --- SEÇÃO 2: MATRIZ DE METAS DINÂMICA ---
+st.subheader("📋 Matriz de Metas Homologadas")
+
 data_metas = {
     "Cluster": ["RE", "MONO", "MULTI", "CSF Interno", "CSF Ajuda", "CSF Quality"],
     "CSAT (Meta Base)": ["84.0%", "Fone: 88% / Dig: 80%", "Fone: 90% / Dig: 80%", "Inativo", "Inativo", "Inativo"],
@@ -65,53 +68,45 @@ data_metas = {
 }
 df_metas = pd.DataFrame(data_metas)
 
-# Filtragem dinâmica via sidebar
+# Filtragem dinâmica de Metas via sidebar
 if cluster_selecionado:
     df_metas = df_metas[df_metas["Cluster"].isin(cluster_selecionado)]
 
-st.markdown("### 📋 Matriz de Metas Homologadas")
-st.dataframe(df_metas, use_container_width=True)
+# hide_index=True remove a primeira coluna numérica automática
+st.dataframe(df_metas, use_container_width=True, hide_index=True)
 
 st.divider()
 
-# --- SEÇÃO 3: TRANSIÇÃO DE PESOS (GRÁFICO INTERATIVO) ---
-st.subheader("🔄 Impacto da Redução de Peso do CSAT")
+# --- SEÇÃO 3: NOVA MATRIZ DE PESOS POR CLUSTER ---
+st.subheader("⚖️ Ponderação e Pesos dos Indicadores por Cluster")
+st.markdown("Detalhamento da distribuição de peso de cada indicador na nota final do Quadrante.")
 
-col_graph, col_insights = st.columns([2, 1])
+data_pesos = {
+    "Cluster": ["RE", "MONO", "MULTI", "CSF Interno", "CSF Ajuda", "CSF Quality"],
+    "CSAT": ["35%", "35%", "30%", "0% (Inativo)", "0% (Inativo)", "0% (Inativo)"],
+    "TMA / TMT": ["30%", "30%", "30%", "30%", "0% (Sem Meta)", "30%"],
+    "Nota de Monitoria": ["25%", "25%", "15%", "45%", "50%", "45%"],
+    "Improcedência Devida": ["10%", "10%", "10%", "0% (Inativo)", "30%", "10%"],
+    "Aderência a Escala": ["0%", "0%", "15%", "25%", "20%", "0%"],
+    "Evasão de Pausas": ["0%", "0%", "0%", "0%", "0%", "15%"]
+}
+df_pesos = pd.DataFrame(data_pesos)
 
-with col_graph:
-    indicadores = ['CSAT', 'TMA / TMT', 'Monitoria', 'Improcedência']
-    pesos_base = [35, 30, 25, 10]
-    pesos_sem_csat = [0, 46, 38, 15]
+# Filtragem dinâmica de Pesos via sidebar
+if cluster_selecionado:
+    df_pesos = df_pesos[df_pesos["Cluster"].isin(cluster_selecionado)]
 
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=indicadores, y=pesos_base,
-        name='Peso Base (Com CSAT)',
-        marker_color='#cbd5e1'
-    ))
-    fig.add_trace(go.Bar(
-        x=indicadores, y=pesos_sem_csat,
-        name='Proporção Sem CSAT (Atual)',
-        marker_color='#007bff'
-    ))
+# hide_index=True aplicado também na tabela de pesos
+st.dataframe(df_pesos, use_container_width=True, hide_index=True)
 
-    fig.update_layout(
-        barmode='group',
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        margin=dict(l=20, r=20, t=20, b=20),
-        height=300,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
-    st.plotly_chart(fig, use_container_width=True)
+st.divider()
 
-with col_insights:
-    st.markdown("#### ⚠️ Alertas da Liderança")
-    st.markdown(
-        """
-        * 🎯 **Volumetria do TMA/TMT:** Sem o CSAT, o peso do TMA saltou para **46%**. É o indicador mais crítico do mês.
-        * 🕒 **Aderência à Escala:** Patamar de **93,5%** necessário para atingir a faixa ouro (Q1).
-        * 🛑 **Evasão de Pausas:** RE e MONO possuem teto rígido de **5 ocorrências** para sustentar a nota máxima.
-        """
-    )
+# --- SEÇÃO 4: ALERTAS OPERACIONAIS ---
+st.markdown("#### ⚠️ Alertas e Direcionamentos Críticos")
+st.markdown(
+    """
+    * 🎯 **Impacto do TMA:** Nos clusters onde o **CSAT está Inativo (CSFs)**, o peso operacional migra severamente para a eficiência de tempo e Monitoria técnica.
+    * 🕒 **Gargalo de Escala:** Os clusters **MULTI, CSF Interno e CSF Ajuda** possuem forte impacto de *Aderência a Escala* na nota final, variando de 15% a 25% do peso total.
+    * 🛑 **Atenção à Evasão:** O indicador de *Evasão de Pausas* agora impacta diretamente com **15% de peso** o resultado do cluster **CSF Quality**.
+    """
+)
