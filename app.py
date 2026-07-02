@@ -37,7 +37,7 @@ filtro_macro = st.sidebar.radio(
     ["Ver Todas as Clusters", "CRC (MONO + MULTI)", "RE", "CSF (Interno, Ajuda, Quality)"]
 )
 
-# Regra de filtragem das linhas (Clusters)
+# Regra de filtragem das colunas/linhas dinâmicas
 clusters_totais = ["RE", "MONO", "MULTI", "CSF Interno", "CSF Ajuda", "CSF Quality"]
 if filtro_macro == "CRC (MONO + MULTI)":
     clusters_filtrados = ["MONO", "MULTI"]
@@ -54,11 +54,10 @@ st.caption(f"Visão Pivotada de Metas, Pesos e Dimensões • Competência: {com
 st.divider()
 
 # ==============================================================================
-# QUADRO ÚNICO: MATRIZ DE INDICADORES E PESOS (CLUSTERS EM LINHAS)
+# QUADRO 1: MATRIZ DE INDICADORES E PESOS (CLUSTERS EM LINHAS)
 # ==============================================================================
 st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
 
-# Estruturação dos dados com as Clusters nas Linhas e Indicadores/Pesos nas Colunas
 dados_matriz_unica = {
     "Cluster": ["RE", "MONO", "MULTI", "CSF Interno", "CSF Ajuda", "CSF Quality"],
     "CSAT (Meta)": ["84.0% (Q1: 91%)", "Fone: 88% / Dig: 80%", "Fone: 90% / Dig: 80%", "Inativo", "Inativo", "Inativo"],
@@ -78,31 +77,36 @@ dados_matriz_unica = {
 }
 
 df_matriz = pd.DataFrame(dados_matriz_unica)
-
-# Aplica o filtro de linhas dinamicamente
 df_matriz_filtrada = df_matriz[df_matriz["Cluster"].isin(clusters_filtrados)]
 
-# Exibe o grande quadro unificado na tela
 st.dataframe(df_matriz_filtrada, use_container_width=True, hide_index=True)
 
 
 # ==============================================================================
-# QUADRO INFERIOR: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA
+# QUADRO 2: RESUMO INVERTIDO (PILARES EM LINHAS, CLUSTERS EM COLUNAS)
 # ==============================================================================
 st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
 
+# Estrutura invertida: Pilares definem as linhas, e os valores de cada cluster viram colunas
 dados_soma_dimensoes = {
-    "Cluster": ["RE", "MONO", "MULTI", "CSF Interno", "CSF Ajuda", "CSF Quality"],
-    "🧠 Experiência do Cliente (CSAT)": ["35%", "35%", "30%", "0%", "0%", "0%"],
-    "⚡ Eficiência Operacional (TMA + Improc.)": ["40%", "40%", "40%", "30%", "30%", "40%"],
-    "📋 Disciplina e Qualidade (Monit. + Escala + Pausas)": ["25%", "25%", "30%", "70%", "70%", "60%"],
-    "∑ TOTAL": ["100%", "100%", "100%", "100%", "100%", "100%"]
+    "Dimensão Estratégica / Pilar": [
+        "🧠 Experiência do Cliente (CSAT)",
+        "⚡ Eficiência Operacional (TMA + Improc.)",
+        "📋 Disciplina e Qualidade (Monit. + Escala + Pausas)",
+        "∑ TOTAL"
+    ],
+    "RE": ["35%", "40%", "25%", "100%"],
+    "MONO": ["35%", "40%", "25%", "100%"],
+    "MULTI": ["30%", "40%", "30%", "100%"],
+    "CSF Interno": ["0%", "30%", "70%", "100%"],
+    "CSF Ajuda": ["0%", "30%", "70%", "100%"],
+    "CSF Quality": ["0%", "40%", "60%", "100%"]
 }
 
-df_dimensoes = pd.DataFrame(dados_soma_dimensoes)
-df_dimensoes_filtrada = df_dimensoes[df_dimensoes["Cluster"].isin(clusters_filtrados)]
+colunas_dimensoes_exibicao = ["Dimensão Estratégica / Pilar"] + clusters_filtrados
+df_dimensoes = pd.DataFrame(dados_soma_dimensoes)[colunas_dimensoes_exibicao]
 
-st.dataframe(df_dimensoes_filtrada, use_container_width=True, hide_index=True)
+st.dataframe(df_dimensoes, use_container_width=True, hide_index=True)
 
 st.divider()
 
@@ -127,7 +131,6 @@ valores_disciplina = [grafico_pesos[c][2] for c in clusters_filtrados]
 
 fig = go.Figure()
 
-# Inclusão de text e textposition para plotar os rótulos de dados diretamente nas barras
 fig.add_trace(go.Bar(
     x=clusters_filtrados, y=valores_csat, 
     name='🧠 Experiência (CSAT)', 
