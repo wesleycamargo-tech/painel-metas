@@ -46,7 +46,7 @@ filtro_macro = st.sidebar.radio(
     ["Ver Todas as Clusters", "RE", "CSF (Interno, Ajuda, Quality)"]
 )
 
-# Definição dos clusters alvo
+# Definição dos clusters alvo (Sincronizados com a planilha)
 clusters_totais = ["RE", "CSF INTERNO", "CSF AJUDA", "CSF QUALITY"]
 if filtro_macro == "RE":
     clusters_filtrados = ["RE"]
@@ -65,15 +65,14 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- PROCESSAMENTO INTELIGENTE DO CSV EMPILHADO ---
+# --- LEITURA E FILTRAGEM DINÂMICA DO CSV ---
 try:
-    # 1. Lê o arquivo único do GitHub
+    # 1. Carrega o CSV bruto
     df_raw = pd.read_csv("metas.csv", header=None)
     
-    # Identifica o mês termo de busca
+    # Determina o termo exato de busca com base no filtro do Streamlit
     mes_procurado = "julho 2026" if "Julho" in competencia else "junho 2026"
     
-    # 2. Encontra em qual linha vertical começa o bloco do mês selecionado
     linha_inicio = None
     for idx, row in df_raw.iterrows():
         val_celula = str(row.iloc[0]).strip().lower()
@@ -82,33 +81,38 @@ try:
             break
 
     if linha_inicio is None:
-        st.error(f"Não encontramos o bloco '{mes_procurado}' dentro do arquivo metas.csv.")
+        st.error(f"Não foi possível localizar o bloco contendo '{mes_procurado}' no arquivo metas.csv.")
     else:
-        # 3. Recorta apenas as linhas pertencentes àquele mês (até encontrar o próximo mês ou fim do arquivo)
         linhas_bloco = []
-        cabeçalho = None
+        colunas_cabecalho = []
         
+        # Varre as linhas sequenciais abaixo do marcador do mês
         for idx in range(linha_inicio + 1, len(df_raw)):
             row = df_raw.iloc[idx]
             primeira_celula = str(row.iloc[0]).strip()
+            row_str = [str(c).strip().upper() for c in row]
             
-            # Se encontrar a marcação do próximo mês (ex: junho 2026 vindo de julho), para de ler
-            if "2026" in primeira_celula and primeira_celula.lower() != mes_procurado:
-                break
-            if "↓ HISTÓRICO" in primeira_celula.upper():
+            # Se atingir o próximo mês ou histórico, interrompe a leitura vertical
+            if idx > (linha_inicio + 2) and ("2026" in primeira_celula or "↓" in primeira_celula or "HISTÓRICO" in primeira_celula.upper()):
                 break
                 
-            # Define dinamicamente o cabeçalho (a linha que contém RE, CSF INTERNO...)
-            if "METAS -" in primeira_celula.upper() or "METAS" in primeira_celula.upper():
-                cabeçalho = [str(c).strip().upper() for c in row]
+            # Identificação robusta da linha de cabeçalho (procura onde estão os clusters)
+            if "CSF INTERNO" in row_str or "RE" in row_str:
+                colunas_cabecalho = [str(c).strip().upper() if pd.notna(c) else "" for c in row]
+                # Preenche a primeira coluna caso venha vazia
+                if colunas_cabecalho[0] == "" or colunas_cabecalho[0] == "NAN":
+                    colunas_cabecalho[0] = "INDICADOR"
                 continue
                 
-            if cabeçalho and primeira_celula != "nan" and primeira_celula != "":
+            # Armazena apenas se o cabeçalho já tiver sido definido e a linha contiver indicadores válidos
+            if len(colunas_cabecalho) > 0 and primeira_celula != "nan" and primeira_celula != "":
+                if "PONDERAÇÃO" in primeira_celula.upper() or "FAIXAS" in primeira_celula.upper():
+                    continue
                 linhas_bloco.append(row)
 
-        # Reconstrói o mini dataframe do mês selecionado
+        # Monta o DataFrame recortado do mês
         df_mes = pd.DataFrame(linhas_bloco)
-        df_mes.columns = cabeçalho
+        df_mes.columns = colunas_cabecalho
 
         # ==============================================================================
         # QUADRO 1: MATRIZ DE INDICADORES (CONSTRUÍDA LIVE)
@@ -123,7 +127,7 @@ try:
             html_tabela += '<th>Meta</th><th>Peso</th>'
         html_tabela += '</tr></thead><tbody>'
 
-        # Definição estática das regras de negócio de Pesos por mês
+        # Definição das regras de pesos do negócio por mês
         if "Julho" in competencia:
             grafico_pesos = {"RE": [35, 40, 25], "CSF INTERNO": [0, 30, 70], "CSF AJUDA": [0, 30, 70], "CSF QUALITY": [0, 40, 60]}
             resumo_dimensoes = {"RE": ["35%", "40%", "25%"], "CSF INTERNO": ["0%", "30%", "70%"], "CSF AJUDA": ["0%", "30%", "70%"], "CSF QUALITY": ["0%", "40%", "60%"]}
@@ -133,14 +137,10 @@ try:
 
         icones = {"CSAT": "💻 ", "TMA": "⏱️ ", "IMPROCEDÊNCIA": "🚫 ", "MONITORIA": "🎧 ", "ADERÊNCIA": "📅 ", "EVASÃO": "🛑 "}
 
-        # Preenche a tabela dinamicamente com as linhas capturadas
         for _, row in df_mes.iterrows():
             indicador_nome = str(row.iloc[0]).strip()
             indicador_upper = indicador_nome.upper()
             
-            if "PONDERAÇÃO" in indicador_upper or "FAIXAS" in indicador_upper or indicador_nome == "":
-                continue
-                
             icone = "🔹 "
             for k, v in icones.items():
                 if k in indicador_upper:
@@ -150,7 +150,6 @@ try:
             html_tabela += f'<tr><td style="text-align: left !important; padding-left: 15px;"><b>{icone}{indicador_nome}</b></td>'
             
             for cluster in clusters_filtrados:
-                # Busca o valor na coluna correspondente
                 meta_val = str(row.get(cluster, "-")).strip()
                 
                 # Atribuição fixa de pesos com base no indicador para o resumo
@@ -213,8 +212,4 @@ try:
         fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_csat, name='🧠 Experiência', marker_color='#1e3a8a', text=[f"{v}%" if v > 0 else "" for v in valores_csat], textposition='inside', textfont=dict(color='white', weight='bold')))
         fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_eficiencia, name='⚡ Eficiência', marker_color='#475569', text=[f"{v}%" if v > 0 else "" for v in valores_eficiencia], textposition='inside', textfont=dict(color='white', weight='bold')))
         fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_disciplina, name='📋 Disciplina e Qualidade', marker_color='#0f766e', text=[f"{v}%" if v > 0 else "" for v in valores_disciplina], textposition='inside', textfont=dict(color='white', weight='bold')))
-        fig.update_layout(barmode='stack', plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=400, margin=dict(l=20, r=20, t=10, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5), yaxis=dict(title="Distribuição de Peso (%)", gridcolor="#e2e8f0"))
-        st.plotly_chart(fig, use_container_width=True)
-
-except Exception as e:
-    st.error(f"Erro ao processar o arquivo metas.csv: {e}")
+        fig.update_layout(barmode='stack', plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=400,
