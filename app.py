@@ -4,169 +4,175 @@ import plotly.graph_objects as go
 
 # Configuração da página Lumia / Streamlit
 st.set_page_config(
-    page_title="Painel Executivo de Metas - Competência Julho 2026",
+    page_title="Painel Executivo de Metas do Quadrante",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Estilização para o padrão executivo e caixas de categorias
+# Estilização para o padrão executivo premium
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
-    .category-header {
-        background-color: #007bff;
+    .macro-title {
+        background-color: #1e293b;
         color: white;
+        padding: 8px 15px;
+        border-radius: 6px;
+        font-weight: bold;
+        font-size: 18px;
+        margin-top: 20px;
+        margin-bottom: 10px;
+    }
+    .badge-subtotal {
+        background-color: #f1f5f9;
         padding: 6px 12px;
         border-radius: 4px;
         font-weight: bold;
-        margin-top: 15px;
-        margin-bottom: 5px;
-    }
-    .total-box {
-        background-color: #e2e8f0;
-        padding: 8px;
-        border-radius: 4px;
-        font-weight: bold;
-        color: #1e293b;
-        margin-bottom: 15px;
+        color: #475569;
+        font-size: 13px;
+        border-left: 4px solid #475569;
+        margin-bottom: 20px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- SIDEBAR: Filtros ---
-st.sidebar.title("Filtros Estratégicos")
+# --- SIDEBAR: Filtros Estratégicos e Seleções Rápidas ---
+st.sidebar.title("🎛️ Filtros Avançados")
 competencia = st.sidebar.selectbox("Competência", ["Julho / 2026", "Junho / 2026", "Maio / 2026"])
-cluster_selecionado = st.sidebar.selectbox(
-    "Visualizar Detalhes do Cluster:", 
-    ["RE", "MONO", "MULTI", "CSF Interno", "CSF Ajuda", "CSF Quality"]
+
+st.sidebar.subheader("Filtrar por Macro-Grupo")
+filtro_macro = st.sidebar.radio(
+    "Exibir no Painel:",
+    ["Ver Todas as Clusters", "CRC (MONO + MULTI)", "RE", "CSF (Interno, Ajuda, Quality)"]
 )
 
+# Definição lógica dos mapeamentos com base no filtro selecionado
+clusters_totais = ["RE", "MONO", "MULTI", "CSF Interno", "CSF Ajuda", "CSF Quality"]
+if filtro_macro == "CRC (MONO + MULTI)":
+    clusters_filtrados = ["MONO", "MULTI"]
+elif filtro_macro == "RE":
+    clusters_filtrados = ["RE"]
+elif filtro_macro == "CSF (Interno, Ajuda, Quality)":
+    clusters_filtrados = ["CSF Interno", "CSF Ajuda", "CSF Quality"]
+else:
+    clusters_filtrados = clusters_totais
+
 # --- TÍTULO PRINCIPAL ---
-st.title("📊 Painel Executivo de Metas do Quadrante")
-st.caption(f"Visualização por Dimensões Estratégicas • Competência: {competencia}")
+st.title("📊 Painel Executivo Unificado de Metas")
+st.caption(f"Visão Consolidada de Metas, Pesos e Dimensões Operacionais • Competência: {competencia}")
 st.divider()
 
-st.subheader(f"🔍 Matriz de Performance: Cluster {cluster_selecionado}")
-
-# --- BANCO DE DADOS COMPLETO (METAS E PESOS VIGENTES POR CLUSTER) ---
-# Dicionário estruturado para buscar dados dinamicamente com base no cluster selecionado
-dados_operacionais = {
-    "RE": {
-        "csat_meta": "84.0% (Q1: 91%)", "csat_peso": 35,
-        "tma_meta": "Conforme dimensionado", "tma_peso": 30,
-        "improc_meta": "≤ 2 Abs", "improc_peso": 10,
-        "ader_meta": "-", "ader_peso": 0,
-        "monit_meta": "90% (Q1: 95%)", "monit_peso": 25,
-        "trein_meta": "95%", "trein_peso": 0,
-        "evasao_meta": "6 a 10 Abs", "evasao_peso": 0
-    },
-    "MONO": {
-        "csat_meta": "Fone: 88% / Dig: 80%", "csat_peso": 35,
-        "tma_meta": "Conforme dimensionado", "tma_peso": 30,
-        "improc_meta": "≤ 2 Abs", "improc_peso": 10,
-        "ader_meta": "-", "ader_peso": 0,
-        "monit_meta": "90% (Q1: 95%)", "monit_peso": 25,
-        "trein_meta": "95%", "trein_peso": 0,
-        "evasao_meta": "≤ 5 Abs", "evasao_peso": 0
-    },
-    "MULTI": {
-        "csat_meta": "Fone: 90% / Dig: 80%", "csat_peso": 30,
-        "tma_meta": "Conforme dimensionado", "tma_peso": 30,
-        "improc_meta": "≤ 2 Abs", "improc_peso": 10,
-        "ader_meta": "88% (Q1: 93.5%)", "ader_peso": 15,
-        "monit_meta": "90% (Q1: 95%)", "monit_peso": 15,
-        "trein_meta": "95%", "trein_peso": 0,
-        "evasao_meta": "-", "evasao_peso": 0
-    },
-    "CSF Interno": {
-        "csat_meta": "Inativo", "csat_peso": 0,
-        "tma_meta": "Conforme dimensionado", "tma_peso": 30,
-        "improc_meta": "-", "improc_peso": 0,
-        "ader_meta": "88% (Q1: 93.5%)", "ader_peso": 25,
-        "monit_meta": "75% (Q1: 83%)", "monit_peso": 45,
-        "trein_meta": "-", "trein_peso": 0,
-        "evasao_meta": "-", "evasao_peso": 0
-    },
-    "CSF Ajuda": {
-        "csat_meta": "Inativo", "csat_peso": 0,
-        "tma_meta": "Sem Meta", "tma_peso": 0,
-        "improc_meta": "1 Abs", "improc_peso": 30,
-        "ader_meta": "88% (Q1: 93.5%)", "ader_peso": 20,
-        "monit_meta": "75% (Q1: 83%)", "monit_peso": 50,
-        "trein_meta": "-", "trein_peso": 0,
-        "evasao_meta": "-", "evasao_peso": 0
-    },
-    "CSF Quality": {
-        "csat_meta": "Inativo", "csat_peso": 0,
-        "tma_meta": "Conforme dimensionado", "tma_peso": 30,
-        "improc_meta": "1 Abs", "improc_peso": 10,
-        "ader_meta": "-", "ader_peso": 0,
-        "monit_meta": "75% (Q1: 83%)", "monit_peso": 45,
-        "trein_meta": "-", "trein_peso": 0,
-        "evasao_meta": "15%", "evasao_peso": 15
-    }
-}
-
-cluster = dados_operacionais[cluster_selecionado]
+# ==============================================================================
+# BASE DE DADOS MATRIZ (Lado a lado por Cluster)
+# ==============================================================================
+colunas_exibicao = ["Dimensão", "Indicador"] + clusters_filtrados
 
 # --- CATEGORIA 1: EXPERIÊNCIA DO CLIENTE ---
-st.markdown('<div class="category-header">🧠 Experiência do Cliente (CSAT)</div>', unsafe_allow_html=True)
-df_exp = pd.DataFrame({
-    "Indicador": ["💻 CSAT Geral / Canais"],
-    "Meta Homologada": [cluster["csat_meta"]],
-    "Peso na Nota": [f"{cluster['csat_peso']}%"]
-})
-st.dataframe(df_exp, use_container_width=True, hide_index=True)
-st.markdown(f'<div class="total-box">Subtotal Peso Experiência: {cluster["csat_peso"]}%</div>', unsafe_allow_html=True)
+st.markdown('<div class="macro-title">🧠 DIMENSÃO: EXPERIÊNCIA DO CLIENTE (CSAT)</div>', unsafe_allow_html=True)
 
-# --- CATEGORIA 2: EFICIÊNCIA ---
-st.markdown('<div class="category-header">⚡ Eficiência Operacional</div>', unsafe_allow_html=True)
-df_efi = pd.DataFrame({
-    "Indicador": ["⏱️ TMA / TMT (Tempo Médio)", "🚫 Improcedência Devida"],
-    "Meta Homologada": [cluster["tma_meta"], cluster["improc_meta"]],
-    "Peso na Nota": [f"{cluster['tma_peso']}%", f"{cluster['improc_peso']}%"]
-})
+dados_csat = {
+    "Dimensão": ["Experiência", "Experiência"],
+    "Indicador": ["💻 CSAT Geral / Canais (Meta)", "⚖️ Peso CSAT"],
+    "RE": ["84.0% (Q1: 91%)", "35%"],
+    "MONO": ["Fone: 88% / Dig: 80%", "35%"],
+    "MULTI": ["Fone: 90% / Dig: 80%", "30%"],
+    "CSF Interno": ["Inativo", "0%"],
+    "CSF Ajuda": ["Inativo", "0%"],
+    "CSF Quality": ["Inativo", "0%"]
+}
+df_csat = pd.DataFrame(dados_csat)[colunas_exibicao]
+st.dataframe(df_csat, use_container_width=True, hide_index=True)
+
+# Pesos dinâmicos para exibir nos subtotais de resumo informativos
+subtotais_csat = {"RE": 35, "MONO": 35, "MULTI": 30, "CSF Interno": 0, "CSF Ajuda": 0, "CSF Quality": 0}
+texto_subtotal_csat = " | ".join([f"**{c}**: {subtotais_csat[c]}%" for c in clusters_filtrados])
+st.markdown(f'<div class="badge-subtotal">∑ Subtotal de Peso da Dimensão Experiência ➜ {texto_subtotal_csat}</div>', unsafe_allow_html=True)
+
+
+# --- CATEGORIA 2: EFICIÊNCIA OPERACIONAL ---
+st.markdown('<div class="macro-title">⚡ DIMENSÃO: EFICIÊNCIA OPERACIONAL</div>', unsafe_allow_html=True)
+
+dados_eficiencia = {
+    "Dimensão": ["Eficiência", "Eficiência", "Eficiência", "Eficiência"],
+    "Indicador": ["⏱️ TMA / TMT (Meta)", "⚖️ Peso TMA/TMT", "🚫 Improcedência Devida (Meta)", "⚖️ Peso Improcedência"],
+    "RE": ["Conforme dimensionado", "30%", "≤ 2 Abs", "10%"],
+    "MONO": ["Conforme dimensionado", "30%", "≤ 2 Abs", "10%"],
+    "MULTI": ["Conforme dimensionado", "30%", "≤ 2 Abs", "10%"],
+    "CSF Interno": ["Conforme dimensionado", "30%", "-", "0%"],
+    "CSF Ajuda": ["Sem Meta", "0%", "1 Abs", "30%"],
+    "CSF Quality": ["Conforme dimensionado", "30%", "1 Abs", "10%"]
+}
+df_efi = pd.DataFrame(dados_eficiencia)[colunas_exibicao]
 st.dataframe(df_efi, use_container_width=True, hide_index=True)
-peso_efi = cluster["tma_peso"] + cluster["improc_peso"]
-st.markdown(f'<div class="total-box">Subtotal Peso Eficiência: {peso_efi}%</div>', unsafe_allow_html=True)
 
-# --- CATEGORIA 3: DISCIPLINA OPERACIONAL ---
-st.markdown('<div class="category-header">📋 Disciplina e Qualidade</div>', unsafe_allow_html=True)
-df_dis = pd.DataFrame({
-    "Indicador": ["📅 Aderência à Escala", "🎧 Nota de Monitoria", "🧠 Treinamento Regulamentar", "🛑 Evasão de Pausas"],
-    "Meta Homologada": [cluster["ader_meta"], cluster["monit_meta"], cluster["trein_meta"], cluster["evasao_meta"]],
-    "Peso na Nota": [f"{cluster['ader_peso']}%", f"{cluster['monit_peso']}%", f"{cluster['trein_meta']}", f"{cluster['evasao_weight'] if 'evasao_weight' in cluster else str(cluster['evasao_peso'])}%"]
-})
-# Ajustando para ler a chave certa do peso da evasão
-df_dis.at[3, "Peso na Nota"] = f"{cluster['evasao_peso']}%"
+subtotais_efi = {"RE": 40, "MONO": 40, "MULTI": 40, "CSF Interno": 30, "CSF Ajuda": 30, "CSF Quality": 40}
+texto_subtotal_efi = " | ".join([f"**{c}**: {subtotais_efi[c]}%" for c in clusters_filtrados])
+st.markdown(f'<div class="badge-subtotal">∑ Subtotal de Peso da Dimensão Eficiência ➜ {texto_subtotal_efi}</div>', unsafe_allow_html=True)
 
+
+# --- CATEGORIA 3: DISCIPLINA E QUALIDADE ---
+st.markdown('<div class="macro-title">📋 DIMENSÃO: DISCIPLINA E QUALIDADE</div>', unsafe_allow_html=True)
+
+dados_disciplina = {
+    "Dimensão": ["Disciplina", "Disciplina", "Disciplina", "Disciplina", "Disciplina", "Disciplina", "Disciplina", "Disciplina"],
+    "Indicador": [
+        "🎧 Nota de Monitoria (Meta Base)", "🎧 Nota de Monitoria (Meta Q1)", "⚖️ Peso Monitoria",
+        "📅 Aderência à Escala (Meta)", "⚖️ Peso Aderência",
+        "🛑 Evasão de Pausas (Meta)", "⚖️ Peso Evasão",
+        "🧠 Treinamento Regulamentar"
+    ],
+    "RE": ["90%", "95%", "25%", "-", "0%", "6 a 10 Abs", "0%", "95%"],
+    "MONO": ["90%", "95%", "25%", "-", "0%", "≤ 5 Abs", "0%", "95%"],
+    "MULTI": ["90%", "95%", "15%", "88% (Q1: 93.5%)", "15%", "-", "0%", "95%"],
+    "CSF Interno": ["75%", "83%", "45%", "88% (Q1: 93.5%)", "25%", "-", "0%", "-"],
+    "CSF Ajuda": ["75%", "83%", "50%", "88% (Q1: 93.5%)", "20%", "-", "0%", "-"],
+    "CSF Quality": ["75%", "83%", "45%", "-", "0%", "15%", "15%", "-"]
+}
+df_dis = pd.DataFrame(dados_disciplina)[colunas_exibicao]
 st.dataframe(df_dis, use_container_width=True, hide_index=True)
-peso_dis = cluster["ader_peso"] + cluster["monit_peso"] + cluster["evasao_peso"]
-st.markdown(f'<div class="total-box">Subtotal Peso Disciplina: {peso_dis}%</div>', unsafe_allow_html=True)
+
+subtotais_dis = {"RE": 25, "MONO": 25, "MULTI": 30, "CSF Interno": 70, "CSF Ajuda": 70, "CSF Quality": 60}
+texto_subtotal_dis = " | ".join([f"**{c}**: {subtotais_dis[c]}%" for c in clusters_filtrados])
+st.markdown(f'<div class="badge-subtotal">∑ Subtotal de Peso da Dimensão Disciplina ➜ {texto_subtotal_dis}</div>', unsafe_allow_html=True)
 
 st.divider()
 
-# --- SEÇÃO GRAFICA (ÚLTIMO CAMPO) ---
-st.subheader("📊 Campo Comparativo: Distribuição de Pesos entre Clusters")
-st.markdown("Veja como a estratégia e os pesos mudam drasticamente de acordo com o perfil de cada cluster.")
+# ==============================================================================
+# GRÁFICO COMPARATIVO EXECUTIVO PREMIUM (Último Campo)
+# ==============================================================================
+st.subheader("📊 Gráfico Comparativo: Arquitetura de Pesos por Macro-Grupo")
+st.markdown("Análise de distribuição do peso total (100%) entre as frentes estratégicas de cada cluster.")
 
-clusters_lista = ["RE", "MONO", "MULTI", "CSF Interno", "CSF Ajuda", "CSF Quality"]
-pesos_csat = [35, 35, 30, 0, 0, 0]
-pesos_eficiencia = [40, 40, 40, 30, 30, 40] # Soma de TMA + Improcedência
-pesos_disciplina = [25, 25, 30, 70, 70, 60] # Soma de Monitoria + Aderência + Evasão
+# Filtrando dados do gráfico dinamicamente com base nas colunas selecionadas
+grafico_pesos = {
+    "RE": [35, 40, 25],
+    "MONO": [35, 40, 25],
+    "MULTI": [30, 40, 30],
+    "CSF Interno": [0, 30, 70],
+    "CSF Ajuda": [0, 30, 70],
+    "CSF Quality": [0, 40, 60]
+}
+
+valores_csat = [grafico_pesos[c][0] for c in clusters_filtrados]
+valores_eficiencia = [grafico_pesos[c][1] for c in clusters_filtrados]
+valores_disciplina = [grafico_pesos[c][2] for c in clusters_filtrados]
 
 fig = go.Figure()
-fig.add_trace(go.Bar(x=clusters_lista, y=pesos_csat, name='🧠 Experiência (CSAT)', marker_color='#007bff'))
-fig.add_trace(go.Bar(x=clusters_lista, y=pesos_eficiencia, name='⚡ Eficiência (TMA/Improc)', marker_color='#ffc107'))
-fig.add_trace(go.Bar(x=clusters_lista, y=pesos_disciplina, name='📋 Disciplina (Monit/Escala/Pausas)', marker_color='#28a745'))
+
+# Cores executivas sóbrias (Paleta Premium Navy Slate Green)
+fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_csat, name='🧠 Experiência (CSAT)', marker_color='#1e3a8a'))
+fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_eficiencia, name='⚡ Eficiência (TMA + Improcedência)', marker_color='#475569'))
+fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_disciplina, name='📋 Disciplina (Monitoria + Escala + Pausas)', marker_color='#0f766e'))
 
 fig.update_layout(
     barmode='stack',
     plot_bgcolor='rgba(0,0,0,0)',
     paper_bgcolor='rgba(0,0,0,0)',
-    height=350,
-    margin=dict(l=10, r=10, t=20, b=10),
-    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
+    height=380,
+    margin=dict(l=20, r=20, t=10, b=10),
+    legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5),
+    yaxis=dict(title="Distribuição de Peso (%)", gridcolor="#e2e8f0")
 )
+
 st.plotly_chart(fig, use_container_width=True)
