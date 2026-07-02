@@ -82,7 +82,7 @@ if cluster_selecionado:
     df_metas = df_metas[df_metas["Cluster"].isin(cluster_selecionado)]
 
 st.markdown("### 📋 Matriz de Metas Homologadas")
-st.dataframe(df_metas.set_index("Cluster"), use_container_width=True)
+st.dataframe(df_metas, use_container_width=True)
 
 st.hr()
 
