@@ -14,22 +14,13 @@ st.set_page_config(
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
-    .metric-card {
-        background-color: #ffffff;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        border-left: 5px solid #007bff;
-        margin-bottom: 15px;
-    }
-    .metric-title { font-size: 14px; color: #6c757d; font-weight: bold; }
-    .metric-value { font-size: 24px; color: #212529; font-weight: bold; }
     .quadrant-box {
         padding: 12px;
         border-radius: 6px;
         text-align: center;
         font-weight: bold;
         color: white;
+        margin-bottom: 10px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -60,8 +51,6 @@ with col3:
     st.markdown('<div class="quadrant-box" style="background-color: #ffc107; color: #212529;">Q3 - Beleza em construção<br>80% a 99%</div>', unsafe_allow_html=True)
 with col4:
     st.markdown('<div class="quadrant-box" style="background-color: #dc3545;">Q4 - Resgatando a essência<br>&lt; 80%</div>', unsafe_allow_html=True)
-
-st.write("")
 
 # --- SEÇÃO 2: MATRIZ DE METAS DINÂMICA ---
 data_metas = {
