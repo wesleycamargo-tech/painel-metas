@@ -141,11 +141,19 @@ st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **C
 st.divider()
 
 # ==============================================================================
-# LÓGICA DE ALTERAÇÃO DE DADOS POR MÊS
+# LÓGICA DE ALTERAÇÃO DE DADOS POR MÊS (COMPLETAMENTE AMARRADA ÀS TABELAS)
 # ==============================================================================
 if "Julho" in competencia:
     peso_csat_mono, peso_csat_multi = "35%", "30%"
     meta_csat_mono = "Fone: 88% / Dig: 80%"
+    
+    # Pesos específicos de Julho para cada indicador
+    p_tma_re, p_tma_mono, p_tma_multi, p_tma_interno, p_tma_ajuda, p_tma_quality = "30%", "30%", "30%", "30%", "0%", "30%"
+    p_imp_re, p_imp_mono, p_imp_multi, p_imp_interno, p_imp_ajuda, p_imp_quality = "10%", "10%", "10%", "0%", "30%", "10%"
+    p_mon_re, p_mon_mono, p_mon_multi, p_mon_interno, p_mon_ajuda, p_mon_quality = "25%", "25%", "15%", "45%", "50%", "45%"
+    p_esc_re, p_esc_mono, p_esc_multi, p_esc_interno, p_esc_ajuda, p_esc_quality = "0%", "0%", "15%", "25%", "20%", "0%"
+    p_pau_re, p_pau_mono, p_pau_multi, p_pau_interno, p_pau_ajuda, p_pau_quality = "0%", "0%", "0%", "0%", "0%", "15%"
+
     grafico_pesos = {
         "RE": [35, 40, 25], "MONO": [35, 40, 25], "MULTI": [30, 40, 30],
         "CSF Interno": [0, 30, 70], "CSF Ajuda": [0, 30, 70], "CSF Quality": [0, 40, 60]
@@ -157,6 +165,14 @@ if "Julho" in competencia:
 elif "Junho" in competencia:
     peso_csat_mono, peso_csat_multi = "40%", "35%"
     meta_csat_mono = "Fone: 87% / Dig: 80%"
+    
+    # Pesos específicos de Junho para cada indicador
+    p_tma_re, p_tma_mono, p_tma_multi, p_tma_interno, p_tma_ajuda, p_tma_quality = "35%", "30%", "30%", "35%", "0%", "35%"
+    p_imp_re, p_imp_mono, p_imp_multi, p_imp_interno, p_imp_ajuda, p_imp_quality = "10%", "10%", "10%", "0%", "25%", "10%"
+    p_mon_re, p_mon_mono, p_mon_multi, p_mon_interno, p_mon_ajuda, p_mon_quality = "20%", "20%", "25%", "40%", "55%", "40%"
+    p_esc_re, p_esc_mono, p_esc_multi, p_esc_interno, p_esc_ajuda, p_esc_quality = "0%", "0%", "0%", "25%", "20%", "0%"
+    p_pau_re, p_pau_mono, p_pau_multi, p_pau_interno, p_pau_ajuda, p_pau_quality = "0%", "0%", "0%", "0%", "0%", "15%"
+
     grafico_pesos = {
         "RE": [35, 45, 20], "MONO": [40, 40, 20], "MULTI": [35, 40, 25],
         "CSF Interno": [0, 35, 65], "CSF Ajuda": [0, 25, 75], "CSF Quality": [0, 45, 55]
@@ -168,6 +184,14 @@ elif "Junho" in competencia:
 else:
     peso_csat_mono, peso_csat_multi = "40%", "40%"
     meta_csat_mono = "Geral: 85%"
+    
+    # Pesos específicos de Maio para cada indicador
+    p_tma_re, p_tma_mono, p_tma_multi, p_tma_interno, p_tma_ajuda, p_tma_quality = "30%", "30%", "25%", "30%", "0%", "35%"
+    p_imp_re, p_imp_mono, p_imp_multi, p_imp_interno, p_imp_ajuda, p_imp_quality = "10%", "10%", "10%", "0%", "40%", "15%"
+    p_mon_re, p_mon_mono, p_mon_multi, p_mon_interno, p_mon_ajuda, p_mon_quality = "20%", "20%", "25%", "45%", "40%", "35%"
+    p_esc_re, p_esc_mono, p_esc_multi, p_esc_interno, p_esc_ajuda, p_esc_quality = "0%", "0%", "0%", "15%", "20%", "0%"
+    p_pau_re, p_pau_mono, p_pau_multi, p_pau_interno, p_pau_ajuda, p_pau_quality = "0%", "0%", "0%", "0%", "0%", "15%"
+
     grafico_pesos = {
         "RE": [40, 40, 20], "MONO": [40, 40, 20], "MULTI": [40, 35, 25],
         "CSF Interno": [0, 40, 60], "CSF Ajuda": [0, 40, 60], "CSF Quality": [0, 50, 50]
@@ -178,7 +202,7 @@ else:
     }
 
 # ==============================================================================
-# QUADRO 1: MATRIZ DE INDICADORES (HTML DINÂMICO)
+# QUADRO 1: MATRIZ DE INDICADORES (HTML REESTRUTURADO E 100% DINÂMICO)
 # ==============================================================================
 st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
 
@@ -188,24 +212,24 @@ dados_base = {
         "CSF Interno": ("Inativo", "0%"), "CSF Ajuda": ("Inativo", "0%"), "CSF Quality": ("Inativo", "0%")
     },
     "TMA / TMT": {
-        "RE": ("Conforme dim.", "30%"), "MONO": ("Conforme dim.", "30%"), "MULTI": ("Conforme dim.", "30%"),
-        "CSF Interno": ("Conforme dim.", "30%"), "CSF Ajuda": ("-", "0%"), "CSF Quality": ("Conforme dim.", "30%")
+        "RE": ("Conforme dim.", p_tma_re), "MONO": ("Conforme dim.", p_tma_mono), "MULTI": ("Conforme dim.", p_tma_multi),
+        "CSF Interno": ("Conforme dim.", p_tma_interno), "CSF Ajuda": ("-", p_tma_ajuda), "CSF Quality": ("Conforme dim.", p_tma_quality)
     },
     "Improcedência Devida": {
-        "RE": ("≤ 2 Abs", "10%"), "MONO": ("≤ 2 Abs", "10%"), "MULTI": ("≤ 2 Abs", "10%"),
-        "CSF Interno": ("-", "0%"), "CSF Ajuda": ("1 Abs", "30%"), "CSF Quality": ("1 Abs", "10%")
+        "RE": ("≤ 2 Abs", p_imp_re), "MONO": ("≤ 2 Abs", p_imp_mono), "MULTI": ("≤ 2 Abs", p_imp_multi),
+        "CSF Interno": ("-", p_imp_interno), "CSF Ajuda": ("1 Abs", p_imp_ajuda), "CSF Quality": ("1 Abs", p_imp_quality)
     },
     "Nota de Monitoria": {
-        "RE": ("90% (Q1: 95%)", "25%"), "MONO": ("90% (Q1: 95%)", "25%"), "MULTI": ("90% (Q1: 95%)", "15%"),
-        "CSF Interno": ("75% (Q1: 83%)", "45%"), "CSF Ajuda": ("75% (Q1: 83%)", "50%"), "CSF Quality": ("75% (Q1: 83%)", "45%")
+        "RE": ("90% (Q1: 95%)", p_mon_re), "MONO": ("90% (Q1: 95%)", p_mon_mono), "MULTI": ("90% (Q1: 95%)", p_mon_multi),
+        "CSF Interno": ("75% (Q1: 83%)", p_mon_interno), "CSF Ajuda": ("75% (Q1: 83%)", p_mon_ajuda), "CSF Quality": ("75% (Q1: 83%)", p_mon_quality)
     },
     "Aderência à Escala": {
-        "RE": ("-", "0%"), "MONO": ("-", "0%"), "MULTI": ("88% (Q1: 93.5%)", "15%"),
-        "CSF Interno": ("88% (Q1: 93.5%)", "25%"), "CSF Ajuda": ("88% (Q1: 93.5%)", "20%"), "CSF Quality": ("-", "0%")
+        "RE": ("-", p_esc_re), "MONO": ("-", p_esc_mono), "MULTI": ("88% (Q1: 93.5%)", p_esc_multi),
+        "CSF Interno": ("88% (Q1: 93.5%)", p_esc_interno), "CSF Ajuda": ("88% (Q1: 93.5%)", p_esc_ajuda), "CSF Quality": ("-", p_esc_quality)
     },
     "Evasão de Pausas": {
-        "RE": ("6 a 10 Abs", "0%"), "MONO": ("≤ 5 Abs", "0%"), "MULTI": ("-", "0%"),
-        "CSF Interno": ("-", "0%"), "CSF Ajuda": ("-", "0%"), "CSF Quality": ("15%", "15%")
+        "RE": ("6 a 10 Abs", p_pau_re), "MONO": ("≤ 5 Abs", p_pau_mono), "MULTI": ("-", p_pau_multi),
+        "CSF Interno": ("-", p_pau_interno), "CSF Ajuda": ("-", p_pau_ajuda), "CSF Quality": ("15%", p_pau_quality)
     },
     "Treinamento": {
         "RE": ("95%", "-"), "MONO": ("95%", "-"), "MULTI": ("95%", "-"),
