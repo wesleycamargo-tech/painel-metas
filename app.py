@@ -35,7 +35,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- SIDEBAR: Filtros e Navegação ---
-st.sidebar.image("https://img.icons8.com/fluent/96/000000/dashboard.png", width=60)
 st.sidebar.title("Filtros Estratégicos")
 competencia = st.sidebar.selectbox("Competência", ["Julho / 2026", "Junho / 2026", "Maio / 2026"])
 cluster_selecionado = st.sidebar.multiselect(
@@ -92,7 +91,6 @@ st.subheader("🔄 Impacto da Redução de Peso do CSAT")
 col_graph, col_insights = st.columns([2, 1])
 
 with col_graph:
-    # Dados de transição
     indicadores = ['CSAT', 'TMA / TMT', 'Monitoria', 'Improcedência']
     pesos_base = [35, 30, 25, 10]
     pesos_sem_csat = [0, 46, 38, 15]
