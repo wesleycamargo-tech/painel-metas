@@ -98,7 +98,7 @@ st.markdown("""
 
 # --- CONFIGURAÇÃO DA PLANILHA (OPÇÃO SEM CREDENCIAIS) ---
 # Substitua o link abaixo pelo link de compartilhamento da sua planilha do Sheets
-URL_PLANILHA = "https://docs.google.com/spreadsheets/d/URL_DA_SUA_PLANILHA_AQUI/edit?usp=sharing"
+URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1e51a-1HihL2iWx-uqYRt_pZidS2jSD9T8IPtNlqbNsg/edit?usp=sharing"
 
 # Criamos a conexão passando apenas a URL pública/link compartilhado da empresa
 conn = st.connection("gsheets", type=GSheetsConnection)
