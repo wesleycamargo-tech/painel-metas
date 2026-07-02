@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilização Executiva Premium + Correção de Espaço + CENTRALIZAÇÃO TOTAL DAS TABELAS
+# Estilização Executiva Avançada via CSS + Centralização e Cores Customizadas
 st.markdown("""
     <style>
     /* Remove o espaço em branco gigante no topo da página */
@@ -19,15 +19,6 @@ st.markdown("""
         padding-bottom: 0rem !important;
     }
     .main { background-color: #f8f9fa; }
-    
-    /* Força a centralização de todo o texto dentro das tabelas (cabeçalho e células) */
-    div[data-testid="stDataFrame"] table th, 
-    div[data-testid="stDataFrame"] table td,
-    div[data-testid="stDataFrame"] [role="gridcell"],
-    div[data-testid="stDataFrame"] [role="columnheader"] {
-        text-align: center !important;
-        justify-content: center !important;
-    }
     
     /* Títulos de seções elegantes */
     .macro-title {
@@ -49,13 +40,37 @@ st.markdown("""
     [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p {
         color: #f8fafc !important;
     }
-    /* Deixar os botões de rádio mais elegantes na sidebar */
     div[data-testid="stRadio"] label {
         color: #cbd5e1 !important;
         font-weight: 500;
     }
     </style>
 """, unsafe_allow_html=True)
+
+# CSS Injetado diretamente para Forçar Centralização Absoluta, Traços em Cinza e Linha do TMA em Cinza
+st.html("""
+    <style>
+    /* Centraliza os cabeçalhos das tabelas */
+    .stDataFrame table th, .stDataFrame [role="columnheader"] {
+        text-align: center !important;
+        justify-content: center !important;
+    }
+    /* Centraliza todas as células das tabelas */
+    .stDataFrame table td, .stDataFrame [role="gridcell"] {
+        text-align: center !important;
+        justify-content: center !important;
+    }
+    /* Estiliza células com traços "-" ou texto "Inativo" para ficarem em cinza claro */
+    .stDataFrame td:contains("-"), .stDataFrame td:contains("Inativo"), .stDataFrame td:contains("Sem Meta") {
+        color: #94a3b8 !important;
+        font-weight: normal !important;
+    }
+    /* Alvo específico para a linha do TMA: deixa todo o texto cinza */
+    .stDataFrame tr:nth-child(2) td {
+        color: #64748b !important;
+    }
+    </style>
+""")
 
 # --- SIDEBAR: Filtros Estratégicos Executivos ---
 st.sidebar.markdown("## 📊 Filtros Corporativos")
@@ -145,22 +160,22 @@ dados_multi_coluna = {
     ("Métrica / Indicador", ""): indicadores_linhas,
     
     ("RE", "Meta"): ["84.0% (Q1: 91%)", "Conforme dim.", "≤ 2 Abs", "90% (Q1: 95%)", "-", "6 a 10 Abs", "95%"],
-    ("RE", "Peso"): ["35%", "30%", "10%", "25%", "0%", "0%", "-"],
+    ("RE", "Peso"): ["35%", "30%", "10%", "25%", "-", "-", "-"],
     
     ("MONO", "Meta"): [meta_csat_mono, "Conforme dim.", "≤ 2 Abs", "90% (Q1: 95%)", "-", "≤ 5 Abs", "95%"],
-    ("MONO", "Peso"): [peso_csat_mono, "30%", "10%", "25%", "0%", "0%", "-"],
+    ("MONO", "Peso"): [peso_csat_mono, "30%", "10%", "25%", "-", "-", "-"],
     
     ("MULTI", "Meta"): ["Fone: 90% / Dig: 80%", "Conforme dim.", "≤ 2 Abs", "90% (Q1: 95%)", "88% (Q1: 93.5%)", "-", "95%"],
-    ("MULTI", "Peso"): [peso_csat_multi, "30%", "10%", "15%", "15%", "0%", "-"],
+    ("MULTI", "Peso"): [peso_csat_multi, "30%", "10%", "15%", "15%", "-", "-"],
     
     ("CSF Interno", "Meta"): ["Inativo", "Conforme dim.", "-", "75% (Q1: 83%)", "88% (Q1: 93.5%)", "-", "-"],
-    ("CSF Interno", "Peso"): ["0%", "30%", "0%", "45%", "25%", "0%", "-"],
+    ("CSF Interno", "Peso"): ["-", "30%", "-", "45%", "25%", "-", "-"],
     
     ("CSF Ajuda", "Meta"): ["Inativo", "Sem Meta", "1 Abs", "75% (Q1: 83%)", "88% (Q1: 93.5%)", "-", "-"],
-    ("CSF Ajuda", "Peso"): ["0%", "0%", "30%", "50%", "20%", "0%", "-"],
+    ("CSF Ajuda", "Peso"): ["-", "-", "30%", "50%", "20%", "-", "-"],
     
     ("CSF Quality", "Meta"): ["Inativo", "Conforme dim.", "1 Abs", "75% (Q1: 83%)", "-", "15%", "-"],
-    ("CSF Quality", "Peso"): ["0%", "30%", "10%", "45%", "0%", "15%", "-"]
+    ("CSF Quality", "Peso"): ["-", "30%", "10%", "45%", "-", "15%", "-"]
 }
 
 df_matriz_complexa = pd.DataFrame(dados_multi_coluna)
@@ -172,8 +187,6 @@ for c in clusters_filtrados:
     colunas_manter.append((c, "Peso"))
 
 df_matriz_exibicao = df_matriz_complexa[colunas_manter]
-
-# Renderização limpa (o alinhamento é feito via CSS global definido no topo do código)
 st.dataframe(df_matriz_exibicao, use_container_width=True, hide_index=True)
 
 
