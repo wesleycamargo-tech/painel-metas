@@ -74,11 +74,9 @@ st.divider()
 mes_nome = competencia.split(" / ")[0].lower()
 ano_nome = competencia.split(" / ")[1]
 
-# Identificação Dinâmica da Era da Operação
 is_era_unificada_csf = (ano_nome == "2025") or (ano_nome == "2026" and mes_nome in ["janeiro", "fevereiro", "março", "marco"])
 has_csf_ajuda = (ano_nome == "2026" and mes_nome in ["junho", "julho"])
 
-# Atribuição Cirúrgica de Pesos Baseada na Linha do Tempo Real do Negócio
 pesos_ativos = {ind: {cl: "-" for cl in clusters_totais} for ind in ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]}
 
 if "julho" in mes_nome and "2026" in ano_nome:
@@ -89,7 +87,6 @@ if "julho" in mes_nome and "2026" in ano_nome:
     pesos_ativos["Aderência à Escala"] = {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "0%"}
     pesos_ativos["Evasão de Pausas"] = {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
 else:
-    # Parâmetros Históricos Oficiais (Consolidados para 2025 até Junho 2026)
     pesos_ativos["CSAT"] = {"RE": "35%", "MONO": "40%", "MULTI": "35%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"}
     pesos_ativos["TMA / TMT"] = {"RE": "35%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "35%", "CSF AJUDA": "0%", "CSF QUALITY": "35%"}
     pesos_ativos["Improcedência Devida"] = {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "10%"}
@@ -97,40 +94,36 @@ else:
     pesos_ativos["Aderência à Escala"] = {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
     pesos_ativos["Evasão de Pausas"] = {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"}
 
-    # Transição Específica da Era de Junho (Abertura do CSF Ajuda)
     if "junho" in mes_nome:
         pesos_ativos["Improcedência Devida"]["CSF AJUDA"] = "30%"
         pesos_ativos["Nota de Monitoria"]["CSF AJUDA"] = "50%"
         pesos_ativos["Aderência à Escala"]["CSF AJUDA"] = "20%"
         
-    # Transição Específica de Março para trás (Qualidade se unia em Aderência, Evasão nasceu em Abril/26)
     if ano_nome == "2026" and mes_nome in ["abril", "maio", "junho"]:
         pesos_ativos["Aderência à Escala"]["CSF QUALITY"] = "0%"
         pesos_ativos["Evasão de Pausas"]["CSF QUALITY"] = "15%"
 
-# --- PROCESSAMENTO EXECUTIVO DO CSV ---
+# --- LEITURA DO CSV ---
 try:
-    # Leitura inteligente com detecção de encoding e separadores
     df_raw = pd.read_csv("metas.csv", header=None, sep=None, engine='python')
 
-    # 1. LOCALIZADOR DE BLOCOS POR CORRESPONDÊNCIA AMPLA
+    # 1. LOCALIZADOR DE BLOCOS ULTRA-FLEXÍVEL (Ignora barras ou espaços)
     idx_inicio = -1
     idx_fim = len(df_raw)
     
+    target_token = mes_nome.replace("ç", "c").strip()
+    
     for idx, row in df_raw.iterrows():
-        txt_linha = " ".join([str(x).strip().lower() for x in row.iloc[:4] if pd.notna(x)])
-        # Garante o match exato de termos simplificados do Sheets (ex: "maio/2026" ou "julho 2026")
-        target_token = mes_nome.replace("ç", "c")
-        clean_linha = txt_linha.replace("ç", "c")
-        if target_token in clean_linha and ano_nome in clean_linha:
+        c0_clean = str(row.iloc[0]).strip().lower().replace("/", " ").replace("ç", "c")
+        if target_token in c0_clean and ano_nome in c0_clean:
             idx_inicio = idx
             break
             
     if idx_inicio != -1:
         for idx in range(idx_inicio + 1, len(df_raw)):
-            txt_linha = " ".join([str(x).strip().lower() for x in df_raw.iloc[idx, :4] if pd.notna(x)])
+            c0_clean = str(df_raw.iloc[idx, 0]).strip().lower().replace("/", " ").replace("ç", "c")
             meses_stop = ["janeiro", "fevereiro", "março", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro", "histórico", "↓"]
-            if any(m in txt_linha for m in meses_stop) and idx > idx_inicio + 3:
+            if any(m in c0_clean for m in meses_stop) and idx > idx_inicio + 2:
                 idx_fim = idx
                 break
                 
@@ -142,7 +135,7 @@ try:
         row_str = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
         if "METAS" in " ".join(row_str) or "RE" in row_str or "CAR" in row_str:
             for i, val in enumerate(row_str):
-                if val in ["RE", "R.E", "CAR", "C.A.R."]: map_cols["RE"] = i
+                if val in ["RE", "R.E", "CAR", "C.A.R.", "C.A.R"]: map_cols["RE"] = i
                 elif "MONO" in val: map_cols["MONO"] = i
                 elif "MULTI" in val: map_cols["MULTI"] = i
                 elif "INTERNO" in val or "CSF INTERNO" in val: map_cols["CSF INTERNO"] = i
@@ -151,15 +144,15 @@ try:
                 elif val == "CSF" or "CSF E QUALITY" in val: map_cols["CSF_GENERICO"] = i
             break
 
-    # amarração para a Era Unificada (Até Março/2026)
     if is_era_unificada_csf and "CSF_GENERICO" in map_cols:
         map_cols["CSF INTERNO"] = map_cols["CSF_GENERICO"]
         map_cols["CSF QUALITY"] = map_cols["CSF_GENERICO"]
+        del map_cols["CSF_GENERICO"]
 
     if not map_cols:
         map_cols = {"RE": 2, "CSF INTERNO": 3, "CSF AJUDA": 4, "CSF QUALITY": 5, "MONO": 6, "MULTI": 7}
 
-    # 3. EXTRATOR DE METAS MULTILINHAS (FONE, DIGITAL, BASE, Q1)
+    # 3. EXTRATOR DE METAS
     oficiais = ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]
     matriz_final = {ind: {cl: {"base": "-", "fone": "-", "dig": "-", "q1": "-"} for cl in clusters_totais} for ind in oficiais}
     current_pAI = None
@@ -178,7 +171,7 @@ try:
             continue
             
         is_parent = False
-        if ("CSAT" in nome_linha or "SATISFAÇÃO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "CSAT"; is_parent = True
+        if ("CSAT" in nome_linha or "SATISFAÇÃO" in nome_linha or "SATISFACAO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "CSAT"; is_parent = True
         elif ("TMA" in nome_linha or "TMT" in nome_linha or "TEMPO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "TMA / TMT"; is_parent = True
         elif ("IMPROCEDÊNCIA" in nome_linha or "IMPROCEDENCIA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Improcedência Devida"; is_parent = True
         elif ("MONITORIA" in nome_linha or "NOTA DE" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Nota de Monitoria"; is_parent = True
@@ -189,20 +182,21 @@ try:
             continue
             
         for cl in clusters_totais:
-            # Trava Absoluta: Oculta o CSF Ajuda se ele não existia no mês avaliado
             if cl == "CSF AJUDA" and not has_csf_ajuda: continue
-            
+            if cl == "CSF QUALITY" and current_pAI == "Aderência à Escala" and not is_era_unificada_csf and mes_nome in ["abril", "maio", "junho", "julho"]: continue
+            if cl == "CSF QUALITY" and current_pAI == "Evasão de Pausas" and is_era_unificada_csf: continue
+
             val = pegar_val(row, cl)
             if val == "-": continue
             
             if "Q1" in nome_linha: matriz_final[current_pAI][cl]["q1"] = val
             elif "FONE" in nome_linha: matriz_final[current_pAI][cl]["fone"] = val
             elif "DIGITAL" in nome_linha or "DIG" in nome_linha: matriz_final[current_pAI][cl]["dig"] = val
-            elif is_parent:
+            else:
                 if matriz_final[current_pAI][cl]["base"] == "-": matriz_final[current_pAI][cl]["base"] = val
 
     # ==============================================================================
-    # QUADRO 1: CONSTRUÇÃO VISUAL DA TABELA INTEGRADA
+    # QUADRO 1: MATRIZ DE INDICADORES
     # ==============================================================================
     st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
     
@@ -223,7 +217,6 @@ try:
         for cluster in clusters_filtrados:
             dados_celula = matriz_final[indicador][cluster]
             
-            # Montagem estruturada do texto da Meta
             meta_html = ""
             if dados_celula["fone"] != "-" or dados_celula["dig"] != "-":
                 f_str = f"Fone: {dados_celula['fone']}" if dados_celula["fone"] != "-" else ""
@@ -240,14 +233,12 @@ try:
             if meta_html == "" or "*** NÃO SEGUIRÁ" in meta_html.upper() or "INATIVO" in meta_html.upper() or "NÃO SEGUIRÁ" in meta_html.upper():
                 meta_html = "-"
 
-            # Regra de Ouro: Se a meta está zerada ou indisponível, o peso desaparece da tela e do gráfico
             peso_val = "-"
             if meta_html != "-":
                 peso_val = pesos_ativos[indicador].get(cluster, "-")
             
             if peso_val == "0%": peso_val = "-"
             
-            # Alimenta a matriz do gráfico em tempo real com inteiros purificados
             try: pesos_sincronizados_grafico[indicador][cluster] = int(peso_val.replace("%", "")) if peso_val != "-" else 0
             except: pesos_sincronizados_grafico[indicador][cluster] = 0
 
@@ -264,12 +255,12 @@ try:
     html_tabela += '</tbody></table>'
     
     if idx_inicio == -1:
-        st.warning(f"Aguardando sincronização do arquivo metas.csv para o mês selecionado.")
+        st.warning(f"Sincronizando a estrutura da planilha metas.csv para {competencia}...")
     else:
         st.html(html_tabela)
 
     # ==============================================================================
-    # SOMA DE PILARES E EXIBIÇÃO DO GRÁFICO DINÂMICO
+    # RESUMO E GRÁFICOS
     # ==============================================================================
     resumo_dimensoes = {}
     for cl in clusters_totais:
