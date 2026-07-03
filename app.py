@@ -67,7 +67,7 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- DICIONÁRIOS DE PESOS (PLANO B OFICIAL) ---
+# --- DICIONÁRIOS DE PESOS DE CONTINGÊNCIA (PLANO B) ---
 mes_procurado = competencia.split(" / ")[0].lower()
 
 pesos_padrao = {}
@@ -90,7 +90,7 @@ else:
         "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
     }
 
-# --- LEITURA E PROCESSAMENTO INTELIGENTE DO CSV ---
+# --- LEITURA E PROCESSAMENTO ULTRA-INTELIGENTE DO CSV ---
 try:
     try:
         df_raw = pd.read_csv("metas.csv", header=None, sep=';')
@@ -98,57 +98,52 @@ try:
     except:
         df_raw = pd.read_csv("metas.csv", header=None, sep=',')
 
-    # 1. ISOLAMENTO DO BLOCO DO MÊS
+    # 1. RADAR GLOBAL DE COLUNAS (Varre o arquivo inteiro para travar as posições reais)
+    map_cols = {}
+    for idx, row in df_raw.iterrows():
+        linha_upper = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
+        if "RE" in linha_upper or "MONO" in linha_upper or "CSF INTERNO" in linha_upper:
+            for i, val in enumerate(linha_upper):
+                if val == "RE" or val == "R.E": map_cols["RE"] = i
+                elif "MONO" in val: map_cols["MONO"] = i
+                elif "MULTI" in val: map_cols["MULTI"] = i
+                elif "INTERNO" in val: map_cols["CSF INTERNO"] = i
+                elif "AJUDA" in val: map_cols["CSF AJUDA"] = i
+                elif "QUALITY" in val: map_cols["CSF QUALITY"] = i
+            if len(map_cols) >= 4:
+                break
+
+    # Caso falte alguma coluna no mapeamento, força a ordem oficial descrita por você
+    if len(map_cols) < 4:
+        map_cols = {"RE": 2, "CSF INTERNO": 3, "CSF AJUDA": 4, "CSF QUALITY": 5, "MONO": 6, "MULTI": 7}
+
+    # 2. LOCALIZADOR FLEXÍVEL DE BLOCOS DE MESES (Fusão Multicolunas A-B-C)
     idx_inicio = -1
     idx_fim = len(df_raw)
     
     for idx, row in df_raw.iterrows():
-        c0 = str(row.iloc[0]).strip().lower() if pd.notna(row.iloc[0]) else ""
-        if mes_procurado in c0:
+        txt_linha = " ".join([str(x).strip().lower() for x in row.iloc[0:4] if pd.notna(x)])
+        if mes_procurado in txt_linha:
             idx_inicio = idx
             break
             
     if idx_inicio != -1:
         for idx in range(idx_inicio + 1, len(df_raw)):
-            c0 = str(df_raw.iloc[idx, 0]).strip().lower() if pd.notna(df_raw.iloc[idx, 0]) else ""
-            if any(m in c0 for m in ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro"]) or "histórico" in c0 or "↓" in c0:
+            txt_linha = " ".join([str(x).strip().lower() for x in df_raw.iloc[idx, 0:4] if pd.notna(df_raw.iloc[idx, 0:4])])
+            meses_stop = ["janeiro", "fevereiro", "março", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "histórico", "↓"]
+            if any(m in txt_linha for m in meses_stop) and mes_procurado not in txt_linha:
                 idx_fim = idx
                 break
                 
     linhas_bloco = df_raw.iloc[idx_inicio:idx_fim] if idx_inicio != -1 else pd.DataFrame()
 
-    # 2. RADAR GLOBAL DE COLUNAS (SCANNER MULTILINHAS ANTI-ERRO)
-    map_cols = {}
-    for idx, row in linhas_bloco.iterrows():
-        row_str = " ".join([str(x).upper() for x in row if pd.notna(x)])
-        
-        # Interrompe o scan assim que chegar nos dados reais das metas
-        if "CSAT" in row_str or "SATISFAÇÃO" in row_str:
-            break
-            
-        for i, val_raw in enumerate(row):
-            val = str(val_raw).upper().strip()
-            if not val: continue
-            
-            # Adiciona ao mapa apenas a primeira vez que encontrar (evita duplicações falsas)
-            if (val == "RE" or val == "R.E") and "RE" not in map_cols: map_cols["RE"] = i
-            elif "MONO" in val and "MONO" not in map_cols: map_cols["MONO"] = i
-            elif "MULTI" in val and "MULTI" not in map_cols: map_cols["MULTI"] = i
-            elif "INTERNO" in val and "CSF INTERNO" not in map_cols: map_cols["CSF INTERNO"] = i
-            elif "AJUDA" in val and "CSF AJUDA" not in map_cols: map_cols["CSF AJUDA"] = i
-            elif "QUALITY" in val and "CSF QUALITY" not in map_cols: map_cols["CSF QUALITY"] = i
-
-    # Se a planilha for completamente bizarra e não tiver cabeçalho, usa um fallback de segurança
-    if len(map_cols) < 2:
-        map_cols = {"RE": 2, "MONO": 3, "MULTI": 4, "CSF INTERNO": 5, "CSF AJUDA": 6, "CSF QUALITY": 7}
-
-    # 3. EXTRAÇÃO DINÂMICA DE PESOS (Com Plano B acoplado ao Radar)
+    # 3. EXTRATOR DINÂMICO DE PESOS (Com amarração ao Radar)
     oficiais = ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]
     pesos_ativos = {ind: {cl: "-" for cl in clusters_totais} for ind in oficiais}
     achou_pesos_no_arquivo = False
     
     map_terms = {
-        "CSAT": ["CSAT", "SATISFAÇÃO"],
+        "CSAT": ["CSAT", "SATISFAÇÃO", "SATISFACAO"],
         "TMA / TMT": ["TMA", "TMT", "TEMPO"],
         "Improcedência Devida": ["IMPROCEDÊNCIA", "IMPROCEDENCIA"],
         "Nota de Monitoria": ["MONITORIA", "NOTA", "QUALIDADE"],
@@ -156,33 +151,40 @@ try:
         "Evasão de Pausas": ["EVASÃO", "EVASAO", "PAUSAS"]
     }
 
-    for idx, row in linhas_bloco.iterrows():
-        c0 = str(row.iloc[0]).upper().strip() if pd.notna(row.iloc[0]) else ""
-        c1 = str(row.iloc[1]).upper().strip() if len(row) > 1 and pd.notna(row.iloc[1]) else ""
-        nome_linha = f"{c0} {c1}"
-        
-        if "PONDERAÇÃO" in nome_linha or "PESOS" in nome_linha or "PESO" in nome_linha:
-            achou_pesos_no_arquivo = True
-            for cl, i_col in map_cols.items():
-                if len(row) > i_col and pd.notna(row.iloc[i_col]):
-                    cell_text = str(row.iloc[i_col]).upper()
-                    for ind, terms in map_terms.items():
-                        for term in terms:
-                            pattern = re.escape(term) + r'.{0,35}?(\d+(?:[.,]\d+)?)\s*%'
-                            match = re.search(pattern, cell_text)
-                            if match:
-                                v = match.group(1).replace(",", ".")
-                                if v.endswith(".0"): v = v[:-2]
-                                pesos_ativos[ind][cl] = v + "%"
-                                break
+    def carregar_pesos_da_lista(lista_rows):
+        achou = False
+        for row_data in lista_rows:
+            row_str = " ".join([str(x).upper() for x in row_data if pd.notna(x)])
+            if "PONDERAÇÃO" in row_str or "PESOS" in row_str or "PESO" in row_str:
+                achou = True
+                for cl, i_col in map_cols.items():
+                    if len(row_data) > i_col and pd.notna(row_data.iloc[i_col]):
+                        cell_text = str(row_data.iloc[i_col]).upper()
+                        for ind, terms in map_terms.items():
+                            for term in terms:
+                                pattern = re.escape(term) + r'.{0,35}?(\d+(?:[.,]\d+)?)\s*%'
+                                match = re.search(pattern, cell_text)
+                                if match:
+                                    v = match.group(1).replace(",", ".")
+                                    if v.endswith(".0"): v = v[:-2]
+                                    pesos_ativos[ind][cl] = v + "%"
+                                    break
+                break
+        return achou
 
-    # Se não achou pesos no CSV, preenche com o padrão histórico para não zerar os gráficos
+    bloco_list = [r for _, r in linhas_bloco.iterrows()] if not linhas_bloco.empty else []
+    raw_list = [r for _, r in df_raw.iterrows()]
+    
+    if not carregar_pesos_da_lista(bloco_list):
+        carregar_pesos_da_lista(raw_list)
+
+    # Força a contingência de pesos vazios
     for ind in oficiais:
         for cl in clusters_totais:
-            if pesos_ativos[ind][cl] == "-" or pesos_ativos[ind][cl] == "0%":
+            if pesos_ativos[ind][cl] == "-" or pesos_ativos[ind][cl] == "0%" or pesos_ativos[ind][cl] == "":
                 pesos_ativos[ind][cl] = pesos_padrao[ind].get(cl, "-")
 
-    # 4. EXTRATOR MESTRE DE METAS (Com base no Radar Global)
+    # 4. EXTRATOR MESTRE DE METAS (Fusão de Células A-B)
     matriz_final = {ind: {cl: {"base": "-", "fone": "-", "dig": "-", "q1": "-"} for cl in clusters_totais} for ind in oficiais}
     current_pAI = None
     
@@ -194,20 +196,18 @@ try:
         return "-"
 
     for idx, row in linhas_bloco.iterrows():
-        c0 = str(row.iloc[0]).upper().strip() if pd.notna(row.iloc[0]) else ""
-        c1 = str(row.iloc[1]).upper().strip() if len(row) > 1 and pd.notna(row.iloc[1]) else ""
-        nome_linha = f"{c0} {c1}"
+        nome_linha = " ".join([str(x).upper().strip() for x in row.iloc[0:2] if pd.notna(x)])
         
         if "METAS" in nome_linha or "PONDERAÇÃO" in nome_linha or "FAIXAS" in nome_linha or "INDICADOR" in nome_linha:
             continue
             
         is_parent = False
-        if ("CSAT" in nome_linha or "SATISFAÇÃO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "CSAT"; is_parent = True
+        if ("CSAT" in nome_linha or "SATISFAÇÃO" in nome_linha or "SATISFACAO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "CSAT"; is_parent = True
         elif ("TMA" in nome_linha or "TMT" in nome_linha or "TEMPO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "TMA / TMT"; is_parent = True
         elif ("IMPROCEDÊNCIA" in nome_linha or "IMPROCEDENCIA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Improcedência Devida"; is_parent = True
         elif ("MONITORIA" in nome_linha or "QUALIDADE" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Nota de Monitoria"; is_parent = True
-        elif ("ADERÊNCIA" in nome_linha or "ESCALA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Aderência à Escala"; is_parent = True
-        elif ("EVASÃO" in nome_linha or "PAUSAS" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Evasão de Pausas"; is_parent = True
+        elif ("ADERÊNCIA" in nome_linha or "ADERENCIA" in nome_linha or "ESCALA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Aderência à Escala"; is_parent = True
+        elif ("EVASÃO" in nome_linha or "EVASAO" in nome_linha or "PAUSAS" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Evasão de Pausas"; is_parent = True
         
         if not current_pAI:
             continue
@@ -224,7 +224,7 @@ try:
                     matriz_final[current_pAI][cl]["base"] = val
 
     # ==============================================================================
-    # QUADRO 1: MATRIZ DE INDICADORES
+    # QUADRO 1: RENDEREZAÇÃO DA PLANILHA
     # ==============================================================================
     st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
     
@@ -283,7 +283,7 @@ try:
         st.html(html_tabela)
 
     # ==============================================================================
-    # PREPARAÇÃO MATEMÁTICA E GRÁFICOS
+    # CALCULADORA MATEMÁTICA DO GRÁFICO
     # ==============================================================================
     resumo_dimensoes = {}
     grafico_pesos = {}
