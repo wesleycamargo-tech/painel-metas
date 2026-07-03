@@ -70,7 +70,7 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- DICIONÁRIOS DE PESOS (MOTOR TEMPORAL) ---
+# --- DICIONÁRIOS DE PESOS DE CONTINGÊNCIA (PLANO B OFICIAL) ---
 mes_nome = competencia.split(" / ")[0].lower()
 ano_nome = competencia.split(" / ")[1]
 
@@ -85,7 +85,7 @@ if "julho" in mes_nome and "2026" in ano_nome:
         "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
     }
 else:
-    # Histórico Padrão (2025 até Junho 2026)
+    # Matriz Padrão (Válida de 2025 até Junho 2026) - As travas anularão o que não existir.
     pesos_padrao = {
         "CSAT": {"RE": "35%", "MONO": "40%", "MULTI": "35%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
         "TMA / TMT": {"RE": "35%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "35%", "CSF AJUDA": "0%", "CSF QUALITY": "35%"},
@@ -95,7 +95,7 @@ else:
         "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"}
     }
 
-# Transição Histórica do CSF Quality: De Abril/26 em diante, Aderência = 0% e Evasão = 15%
+# Transição Histórica do CSF Quality: Em Abril/26, Aderência morre e Evasão nasce.
 if ano_nome == "2026" and mes_nome in ["abril", "maio", "junho", "julho"]:
     pesos_padrao["Aderência à Escala"]["CSF QUALITY"] = "0%"
     pesos_padrao["Evasão de Pausas"]["CSF QUALITY"] = "15%"
@@ -129,15 +129,15 @@ try:
                 
     linhas_bloco = df_raw.iloc[idx_inicio:idx_fim] if idx_inicio != -1 else pd.DataFrame()
 
-    # 2. RADAR OPERACIONAL DE CABEÇALHOS (Scanner Profundo sem freio)
+    # 2. RADAR OPERACIONAL DE CABEÇALHOS (Scanner Multilinha)
     map_cols = {}
     for idx in range(max(0, idx_inicio - 1), min(len(df_raw), idx_fim)):
         row = df_raw.iloc[idx]
         row_str = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
         txt_full = " ".join(row_str)
         
-        # O Radar só para de procurar colunas na hora que bate nos dados reais (evita perder colunas mescladas abaixo)
-        if any(c in txt_full for c in ["CSAT", "SATISFAÇÃO", "SATISFACAO", "TMA", "IMPROCEDÊNCIA", "IMPROCEDENCIA", "METAS", "PONDERAÇÃO"]):
+        # O Radar para antes de ler as metas para não confundir nomes
+        if any(c in txt_full for c in ["CSAT", "SATISFAÇÃO", "SATISFACAO", "TMA", "IMPROCEDÊNCIA", "IMPROCEDENCIA"]):
             break
             
         for i, val in enumerate(row_str):
@@ -148,9 +148,9 @@ try:
             elif "INTERNO" in val or "CSF INTERNO" in val: map_cols["CSF INTERNO"] = i
             elif "AJUDA" in val or "CSF AJUDA" in val: map_cols["CSF AJUDA"] = i
             elif "QUALITY" in val or "CSF QUALITY" in val: map_cols["CSF QUALITY"] = i
-            elif val == "CSF": map_cols["CSF_GENERICO"] = i
+            elif val == "CSF" and "CSF_GENERICO" not in map_cols: map_cols["CSF_GENERICO"] = i
             
-    # Tratamento Histórico: Clona a coluna unificada CSF para Interno e Quality se não tiverem sido achados separadamente
+    # Clonagem do CSF Genérico para as eras mais antigas
     if "CSF_GENERICO" in map_cols:
         if "CSF INTERNO" not in map_cols: map_cols["CSF INTERNO"] = map_cols["CSF_GENERICO"]
         if "CSF QUALITY" not in map_cols: map_cols["CSF QUALITY"] = map_cols["CSF_GENERICO"]
@@ -167,7 +167,7 @@ try:
         "CSAT": ["CSAT", "SATISFAÇÃO", "SATISFACAO"],
         "TMA / TMT": ["TMA", "TMT", "TEMPO"],
         "Improcedência Devida": ["IMPROCEDÊNCIA", "IMPROCEDENCIA"],
-        "Nota de Monitoria": ["MONITORIA", "NOTA", "QUALIDADE"],
+        "Nota de Monitoria": ["MONITORIA", "NOTA DE"],
         "Aderência à Escala": ["ADERÊNCIA", "ADERENCIA", "ESCALA"],
         "Evasão de Pausas": ["EVASÃO", "EVASAO", "PAUSAS"]
     }
@@ -191,29 +191,31 @@ try:
                                 break
             break
 
-    # Travas Históricas de Pesos
+    # 1º Passo: Preenche buracos com a matriz oficial
     for ind in oficiais:
         for cl in clusters_totais:
-            # Trava Absoluta do CSF Ajuda: Nasce em Junho/2026
-            if cl == "CSF AJUDA":
-                if ano_nome == "2025" or (ano_nome == "2026" and mes_nome in ["janeiro", "fevereiro", "março", "marco", "abril", "maio"]):
-                    pesos_ativos[ind][cl] = "-"
-                    continue
-            
-            # Trava Histórica do CSF Quality (Aderência encerra em Março/26, Evasão nasce em Abril/26)
-            if cl == "CSF QUALITY" and ind == "Aderência à Escala":
-                if ano_nome == "2026" and mes_nome in ["abril", "maio", "junho", "julho"]:
-                    pesos_ativos[ind][cl] = "-"
-                    continue
-            if cl == "CSF QUALITY" and ind == "Evasão de Pausas":
-                if ano_nome == "2025" or (ano_nome == "2026" and mes_nome in ["janeiro", "fevereiro", "março", "marco"]):
-                    pesos_ativos[ind][cl] = "-"
-                    continue
-                    
             if not achou_pesos_no_arquivo or pesos_ativos[ind][cl] == "-" or pesos_ativos[ind][cl] == "0%" or pesos_ativos[ind][cl] == "":
                 pesos_ativos[ind][cl] = pesos_padrao[ind].get(cl, "-")
 
-    # 4. EXTRATOR MESTRE DE METAS (Com Trava Temporal)
+    # 2º Passo: Aplica as TRAVAS HISTÓRICAS (Isso impede que o padrão invada os meses proibidos)
+    for ind in oficiais:
+        for cl in clusters_totais:
+            # Trava Absoluta CSF Ajuda: Morto antes de Junho/2026
+            if cl == "CSF AJUDA":
+                if ano_nome == "2025" or (ano_nome == "2026" and mes_nome in ["janeiro", "fevereiro", "março", "marco", "abril", "maio"]):
+                    pesos_ativos[ind][cl] = "-"
+            
+            # Trava Absoluta CSF Quality Aderência: Morre após Março/2026
+            if cl == "CSF QUALITY" and ind == "Aderência à Escala":
+                if ano_nome == "2026" and mes_nome in ["abril", "maio", "junho", "julho"]:
+                    pesos_ativos[ind][cl] = "-"
+            
+            # Trava Absoluta CSF Quality Evasão: Morto antes de Abril/2026
+            if cl == "CSF QUALITY" and ind == "Evasão de Pausas":
+                if ano_nome == "2025" or (ano_nome == "2026" and mes_nome in ["janeiro", "fevereiro", "março", "marco"]):
+                    pesos_ativos[ind][cl] = "-"
+
+    # 4. EXTRATOR MESTRE DE METAS (Blindado contra linhas com "Indicador")
     matriz_final = {ind: {cl: {"base": "-", "fone": "-", "dig": "-", "q1": "-"} for cl in clusters_totais} for ind in oficiais}
     current_pAI = None
     
@@ -227,14 +229,16 @@ try:
     for idx, row in linhas_bloco.iterrows():
         nome_linha = " ".join([str(x).upper().strip() for x in row.iloc[:3] if pd.notna(x)])
         
-        if "METAS" in nome_linha or "PONDERAÇÃO" in nome_linha or "FAIXAS" in nome_linha or "INDICADOR" in nome_linha:
+        # Apenas pula Ponderação e Faixas. "Indicador" agora é permitido para não pular a Aderência!
+        if any(palavra in nome_linha for palavra in ["PONDERAÇÃO", "PONDERACAO", "FAIXAS", "PESOS"]):
             continue
             
         is_parent = False
         if ("CSAT" in nome_linha or "SATISFAÇÃO" in nome_linha or "SATISFACAO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "CSAT"; is_parent = True
         elif ("TMA" in nome_linha or "TMT" in nome_linha or "TEMPO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "TMA / TMT"; is_parent = True
         elif ("IMPROCEDÊNCIA" in nome_linha or "IMPROCEDENCIA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Improcedência Devida"; is_parent = True
-        elif ("MONITORIA" in nome_linha or "QUALIDADE" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Nota de Monitoria"; is_parent = True
+        # Alterado para "NOTA DE" para impedir que o cabeçalho "CSF Quality" dispare a leitura falsa da Monitoria
+        elif ("MONITORIA" in nome_linha or "NOTA DE" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Nota de Monitoria"; is_parent = True
         elif ("ADERÊNCIA" in nome_linha or "ADERENCIA" in nome_linha or "ESCALA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Aderência à Escala"; is_parent = True
         elif ("EVASÃO" in nome_linha or "EVASAO" in nome_linha or "PAUSAS" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Evasão de Pausas"; is_parent = True
         
@@ -242,17 +246,17 @@ try:
             continue
             
         for cl in clusters_totais:
-            # Trava Absoluta: CSF Ajuda antes de Junho/2026
+            # Trava Absoluta Metas: CSF Ajuda antes de Junho/2026
             if cl == "CSF AJUDA":
                 if ano_nome == "2025" or (ano_nome == "2026" and mes_nome in ["janeiro", "fevereiro", "março", "marco", "abril", "maio"]):
                     continue
             
-            # Trava Absoluta: CSF Quality Aderência após Março/2026
+            # Trava Absoluta Metas: CSF Quality Aderência após Março/2026
             if cl == "CSF QUALITY" and current_pAI == "Aderência à Escala":
                 if ano_nome == "2026" and mes_nome in ["abril", "maio", "junho", "julho"]:
                     continue
             
-            # Trava Absoluta: CSF Quality Evasão antes de Abril/2026
+            # Trava Absoluta Metas: CSF Quality Evasão antes de Abril/2026
             if cl == "CSF QUALITY" and current_pAI == "Evasão de Pausas":
                 if ano_nome == "2025" or (ano_nome == "2026" and mes_nome in ["janeiro", "fevereiro", "março", "marco"]):
                     continue
@@ -260,9 +264,12 @@ try:
             val = pegar_val(row, cl)
             if val == "-": continue
             
-            if "Q1" in nome_linha: matriz_final[current_pAI][cl]["q1"] = val
-            elif "FONE" in nome_linha: matriz_final[current_pAI][cl]["fone"] = val
-            elif "DIGITAL" in nome_linha or "DIG" in nome_linha: matriz_final[current_pAI][cl]["dig"] = val
+            if "Q1" in nome_linha: 
+                matriz_final[current_pAI][cl]["q1"] = val
+            elif "FONE" in nome_linha: 
+                matriz_final[current_pAI][cl]["fone"] = val
+            elif "DIGITAL" in nome_linha or "DIG" in nome_linha: 
+                matriz_final[current_pAI][cl]["dig"] = val
             else:
                 if matriz_final[current_pAI][cl]["base"] == "-": 
                     matriz_final[current_pAI][cl]["base"] = val
