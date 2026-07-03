@@ -31,13 +31,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- SIDEBAR ---
+# --- SIDEBAR: Menu Histórico Consolidado ---
 st.sidebar.markdown("## 📊 Filtros Corporativos")
 st.sidebar.markdown("---")
 
 competencia = st.sidebar.selectbox(
     "Selecione a Competência:", 
-    ["Julho / 2026", "Junho / 2026", "Maio / 2026", "Abril / 2026", "Março / 2026", "Fevereiro / 2026", "Janeiro / 2026"]
+    [
+        "Julho / 2026", "Junho / 2026", "Maio / 2026", "Abril / 2026", "Março / 2026", "Fevereiro / 2026", "Janeiro / 2026",
+        "Dezembro / 2025", "Novembro / 2025", "Outubro / 2025", "Setembro / 2025", "Agosto / 2025", "Julho / 2025", "Junho / 2025", "Maio / 2025", "Abril / 2025"
+    ]
 )
 
 st.sidebar.markdown("---")
@@ -67,11 +70,12 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- DICIONÁRIOS DE PESOS DE CONTINGÊNCIA (PLANO B OFICIAL) ---
-mes_procurado = competencia.split(" / ")[0].lower()
+# --- ARQUITETURA DE CONTINGÊNCIA DE PESOS HISTÓRICOS ---
+mes_nome = competencia.split(" / ")[0].lower()
+ano_nome = competencia.split(" / ")[1]
 
 pesos_padrao = {}
-if "julho" in mes_procurado:
+if "julho" in mes_nome and "2026" in ano_nome:
     pesos_padrao = {
         "CSAT": {"RE": "35%", "MONO": "35%", "MULTI": "30%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
         "TMA / TMT": {"RE": "30%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "30%", "CSF AJUDA": "0%", "CSF QUALITY": "30%"},
@@ -81,7 +85,7 @@ if "julho" in mes_procurado:
         "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
     }
 else:
-    # Contingência para meses históricos (evita quebrar caso não ache a linha "Ponderação")
+    # Configuração Histórica Segura: CSF Quality com 15% na Aderência e 0% na Evasão
     pesos_padrao = {
         "CSAT": {"RE": "35%", "MONO": "40%", "MULTI": "35%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
         "TMA / TMT": {"RE": "35%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "35%", "CSF AJUDA": "0%", "CSF QUALITY": "35%"},
@@ -91,7 +95,7 @@ else:
         "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"}
     }
 
-# --- LEITURA E PROCESSAMENTO ULTRA-BLINDADO DO CSV ---
+# --- PROCESSAMENTO DO ARQUIVO CSV ---
 try:
     try:
         df_raw = pd.read_csv("metas.csv", header=None, sep=';')
@@ -99,59 +103,52 @@ try:
     except:
         df_raw = pd.read_csv("metas.csv", header=None, sep=',')
 
-    # 1. LOCALIZADOR BLINDADO DE BLOCOS (Busca ampla nas 5 primeiras colunas)
+    # 1. LOCALIZADOR DINÂMICO DE BLOCOS (Isolamento por Mês e Ano)
     idx_inicio = -1
     idx_fim = len(df_raw)
     
     for idx, row in df_raw.iterrows():
-        # Olha as primeiras 5 colunas para achar o mês, assim não importa onde o Excel mesclou
         txt_linha = " ".join([str(x).strip().lower() for x in row.iloc[:5] if pd.notna(x)])
-        if mes_procurado in txt_linha:
+        if mes_nome in txt_linha and ano_nome in txt_linha:
             idx_inicio = idx
             break
             
     if idx_inicio != -1:
         for idx in range(idx_inicio + 1, len(df_raw)):
             txt_linha = " ".join([str(x).strip().lower() for x in df_raw.iloc[idx, :5] if pd.notna(x)])
-            meses_stop = ["janeiro", "fevereiro", "março", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro", "histórico", "↓"]
-            
-            # Se encontrar o nome de OUTRO mês, e a linha for curta (para não confundir com textos de meta)
-            if any(m in txt_linha for m in meses_stop) and mes_procurado not in txt_linha:
-                if len(txt_linha) < 50 or "2026" in txt_linha or "2025" in txt_linha or "histórico" in txt_linha or "↓" in txt_linha:
+            meses_stop = ["janeiro", "fevereiro", "março", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
+            if any(m in txt_linha for m in meses_stop) and (ano_nome in txt_linha or "2025" in txt_linha or "2026" in txt_linha or "↓" in txt_linha or "histórico" in txt_linha):
+                if idx > idx_inicio + 2:
                     idx_fim = idx
                     break
                 
     linhas_bloco = df_raw.iloc[idx_inicio:idx_fim] if idx_inicio != -1 else pd.DataFrame()
 
-    # 2. RADAR DE COLUNAS ASCENDENTE (Acha onde as colunas RE, MONO e MULTI caíram)
+    # 2. RADAR OPERACIONAL DE CABEÇALHOS (Scanner de Proximidade)
     map_cols = {}
-    
-    def mapear_linha(row_data):
-        m_cols = {}
-        row_str = [str(x).upper().strip() if pd.notna(x) else "" for x in row_data]
-        if "RE" in row_str or "R.E" in row_str or "R.E." in row_str:
+    for idx in range(max(0, idx_inicio - 1), min(len(df_raw), idx_fim)):
+        row = df_raw.iloc[idx]
+        row_str = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
+        if "RE" in row_str or "CSF" in row_str or "MONO" in row_str or "INTERNO" in row_str:
             for i, val in enumerate(row_str):
-                if val in ["RE", "R.E", "R.E."]: m_cols["RE"] = i
-                elif "MONO" in val or "CRC MONO" in val: m_cols["MONO"] = i
-                elif "MULTI" in val or "CRC MULTI" in val: m_cols["MULTI"] = i
-                elif "INTERNO" in val or "CSF INTERNO" in val: m_cols["CSF INTERNO"] = i
-                elif "AJUDA" in val or "CSF AJUDA" in val: m_cols["CSF AJUDA"] = i
-                elif "QUALITY" in val or "CSF QUALITY" in val: m_cols["CSF QUALITY"] = i
-        return m_cols
-
-    for idx, row in linhas_bloco.iterrows():
-        map_cols = mapear_linha(row)
-        if len(map_cols) >= 3: break # Já achou uma quantidade razoável de colunas
-
-    if not map_cols and idx_inicio > 0:
-        for i in range(idx_inicio, -1, -1):
-            map_cols = mapear_linha(df_raw.iloc[i])
-            if len(map_cols) >= 3: break
+                if val in ["RE", "R.E", "R.E."]: map_cols["RE"] = i
+                elif "MONO" in val or "CRC MONO" in val: map_cols["MONO"] = i
+                elif "MULTI" in val or "CRC MULTI" in val: map_cols["MULTI"] = i
+                elif "INTERNO" in val or "CSF INTERNO" in val: map_cols["CSF INTERNO"] = i
+                elif "AJUDA" in val or "CSF AJUDA" in val: map_cols["CSF AJUDA"] = i
+                elif "QUALITY" in val or "CSF QUALITY" in val: map_cols["CSF QUALITY"] = i
+                elif "CSF" in val: map_cols["CSF_GENERICO"] = i
+            
+            # Tratamento Estrutural Pré-Março: Clona a coluna CSF unificada para Interno e Quality
+            if "CSF_GENERICO" in map_cols:
+                if "CSF INTERNO" not in map_cols: map_cols["CSF INTERNO"] = map_cols["CSF_GENERICO"]
+                if "CSF QUALITY" not in map_cols: map_cols["CSF QUALITY"] = map_cols["CSF_GENERICO"]
+            break
 
     if not map_cols:
         map_cols = {"RE": 2, "MONO": 3, "MULTI": 4, "CSF INTERNO": 5, "CSF AJUDA": 6, "CSF QUALITY": 7}
 
-    # 3. EXTRATOR DINÂMICO DE PESOS
+    # 3. EXTRAÇÃO DE PESOS DA COMPETÊNCIA
     oficiais = ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]
     pesos_ativos = {ind: {cl: "-" for cl in clusters_totais} for ind in oficiais}
     achou_pesos_no_arquivo = False
@@ -170,6 +167,7 @@ try:
         if "PONDERAÇÃO" in row_str or "PESOS" in row_str or "PESO" in row_str:
             achou_pesos_no_arquivo = True
             for cl, i_col in map_cols.items():
+                if cl == "CSF_GENERICO": continue
                 if len(row) > i_col and pd.notna(row.iloc[i_col]):
                     cell_text = str(row.iloc[i_col]).upper()
                     for ind, terms in map_terms.items():
@@ -183,6 +181,7 @@ try:
                                 break
             break
 
+    # Garante o acoplamento do Plano B
     if not achou_pesos_no_arquivo:
         pesos_ativos = pesos_padrao
 
@@ -191,7 +190,7 @@ try:
             if pesos_ativos[ind][cl] == "-" or pesos_ativos[ind][cl] == "0%" or pesos_ativos[ind][cl] == "":
                 pesos_ativos[ind][cl] = pesos_padrao[ind].get(cl, "-")
 
-    # 4. EXTRATOR MESTRE DE METAS (Lê colunas A, B e C para garantir que o indicador não escape)
+    # 4. CONSOLIDAÇÃO DE METAS POR COLUNAS TRAVADAS
     matriz_final = {ind: {cl: {"base": "-", "fone": "-", "dig": "-", "q1": "-"} for cl in clusters_totais} for ind in oficiais}
     current_pAI = None
     
@@ -203,7 +202,6 @@ try:
         return "-"
 
     for idx, row in linhas_bloco.iterrows():
-        # Funde as 3 primeiras colunas para não perder "CSAT", "TMA", etc., se a formatação mudou
         nome_linha = " ".join([str(x).upper().strip() for x in row.iloc[:3] if pd.notna(x)])
         
         if "METAS" in nome_linha or "PONDERAÇÃO" in nome_linha or "FAIXAS" in nome_linha or "INDICADOR" in nome_linha:
@@ -232,7 +230,7 @@ try:
                     matriz_final[current_pAI][cl]["base"] = val
 
     # ==============================================================================
-    # QUADRO 1: MATRIZ DE INDICADORES (CONSTRUÇÃO VISUAL)
+    # QUADRO 1: MATRIZ DE INDICADORES
     # ==============================================================================
     st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
     
@@ -285,8 +283,8 @@ try:
         
     html_tabela += '</tbody></table>'
     
-    if len(linhas_bloco) == 0:
-        st.warning(f"Sem dados localizados para a competência de {mes_procurado.capitalize()}.")
+    if idx_inicio == -1:
+        st.warning(f"Sem dados localizados para a competência selecionada no arquivo metas.csv.")
     else:
         st.html(html_tabela)
 
@@ -307,7 +305,7 @@ try:
         resumo_dimensoes[cl] = [f"{exp}%", f"{efi}%", f"{dis}%"]
         grafico_pesos[cl] = [exp, efi, dis]
 
-    if len(linhas_bloco) > 0:
+    if idx_inicio != -1 and len(linhas_bloco) > 0:
         st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
         html_resumo = '<table class="table-executiva"><thead><tr><th>Dimensão Estratégica / Pilar</th>'
         for cluster in clusters_filtrados:
