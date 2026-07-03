@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilização Executiva Premium + Correção de Espaço no Topo
+# Estilização Executiva Premium
 st.markdown("""
     <style>
     .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; }
@@ -46,7 +46,6 @@ filtro_macro = st.sidebar.radio(
     ["Ver Todas as Clusters", "RE", "CSF (Interno, Ajuda, Quality)"]
 )
 
-# Definição dos clusters alvo
 clusters_totais = ["RE", "CSF INTERNO", "CSF AJUDA", "CSF QUALITY"]
 if filtro_macro == "RE":
     clusters_filtrados = ["RE"]
@@ -65,62 +64,52 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- LEITURA E PROCESSO DO CSV ---
+# --- LEITURA DIRETA COMPACTA ---
 try:
     df_raw = pd.read_csv("metas.csv", header=None)
-    
-    # Busca apenas a palavra-chave principal (julho ou junho)
     mes_procurado = "julho" if "Julho" in competencia else "junho"
     
-    linha_inicio = None
+    # Localiza o índice inicial da seção do mês
+    idx_inicio = None
     for idx, row in df_raw.iterrows():
-        val_celula = str(row.iloc[0]).strip().lower()
-        if mes_procurado in val_celula:
-            linha_inicio = idx
+        txt = str(row.iloc[0]).strip().lower()
+        if mes_procurado in txt:
+            idx_inicio = idx
             break
 
-    if linha_inicio is None:
-        st.error(f"Não foi possível localizar o bloco para o mês de '{mes_procurado}' no arquivo metas.csv.")
+    if idx_inicio is None:
+        st.error(f"Não localizamos a seção contendo '{mes_procurado}' no arquivo metas.csv.")
     else:
-        linhas_bloco = []
-        colunas_cabecalho = []
-        
-        for idx in range(linha_inicio + 1, len(df_raw)):
-            row = df_raw.iloc[idx]
-            primeira_celula = str(row.iloc[0]).strip()
-            row_str = [str(c).strip().upper() for c in row if pd.notna(c)]
+        # Coleta as linhas pertencentes a este mês limpando ruídos vazios
+        linhas_validas = []
+        for i in range(idx_inicio + 1, len(df_raw)):
+            row = df_raw.iloc[i]
+            val_primeiro = str(row.iloc[0]).strip()
             
-            # Condição de parada flexível
-            if idx > (linha_inicio + 2) and (
-                ("junho" in primeira_celula.lower() and mes_procurado == "julho") or 
-                ("julho" in primeira_celula.lower() and mes_procurado == "junho") or 
-                ("maio" in primeira_celula.lower()) or
-                ("↓" in primeira_celula) or 
-                ("HISTÓRICO" in primeira_celula.upper())
-            ):
+            # Condição de parada ao encontrar outro marcador de mês
+            if i > (idx_inicio + 2) and ("2026" in val_primeiro or "↓" in val_primeiro or "HISTÓRICO" in val_primeiro.upper() or ("junho" in val_primeiro.lower() and mes_procurado == "julho") or ("julho" in val_primeiro.lower() and mes_procurado == "junho")):
                 break
                 
-            # Identificação do cabeçalho
-            if "CSF INTERNO" in row_str or "RE" in row_str or "CSF QUALITY" in row_str:
-                colunas_cabecalho = [str(c).strip().upper() if pd.notna(c) and str(c).strip() != "" else f"COL_{i}" for i, c in enumerate(row)]
-                colunas_cabecalho[0] = "INDICADOR"
+            # Ignora linhas nulas ou de formatação de títulos internos
+            if val_primeiro == "nan" or val_primeiro == "" or "METAS" in val_primeiro.upper() or "PONDERAÇÃO" in val_primeiro.upper() or "FAIXAS" in val_primeiro.upper():
                 continue
                 
-            # Captura a linha de dados
-            if primeira_celula != "nan" and primeira_celula != "":
-                if "PONDERAÇÃO" in primeira_celula.upper() or "FAIXAS" in primeira_celula.upper() or "METAS" in primeira_celula.upper():
-                    continue
-                linhas_bloco.append(row)
+            linhas_validas.append(row)
 
-        if len(linhas_bloco) == 0:
-            st.warning(f"Buscando estrutura de dados... O bloco '{mes_procurado}' foi localizado, mas suas linhas internas estão em formato de leitura incompatível.")
+        if len(linhas_validas) == 0:
+            st.error("Dados estruturais não foram encontrados nesse bloco. Verifique o metas.csv.")
         else:
-            if len(colunas_cabecalho) == 0:
-                colunas_cabecalho = ["INDICADOR", "RE", "CSF INTERNO", "CSF AJUDA", "CSF QUALITY"]
+            # Reconstrói a sub-tabela ignorando colunas em branco extras da planilha
+            df_mes = pd.DataFrame(linhas_validas)
+            df_mes = df_mes.dropna(how='all', axis=1) # Limpa colunas fantasmas à direita
             
-            df_mes = pd.DataFrame(linhas_bloco)
-            df_mes = df_mes.iloc[:, :len(colunas_cabecalho)]
-            df_mes.columns = colunas_cabecalho
+            # Mapeia as colunas diretamente baseado nas posições reais padrão
+            colunas_completas = ["INDICADOR", "RE", "CSF INTERNO", "CSF AJUDA", "CSF QUALITY"]
+            
+            # Garante que o número de colunas coincida com o tamanho real dos dados limpos
+            qtd_cols = min(len(colunas_completas), df_mes.shape[1])
+            df_mes = df_mes.iloc[:, :qtd_cols]
+            df_mes.columns = colunas_completas[:qtd_cols]
 
             # ==============================================================================
             # QUADRO 1: MATRIZ DE INDICADORES
@@ -135,6 +124,7 @@ try:
                 html_tabela += '<th>Meta</th><th>Peso</th>'
             html_tabela += '</tr></thead><tbody>'
 
+            # Definição estática de pesos corporativos
             if "julho" in mes_procurado:
                 grafico_pesos = {"RE": [35, 40, 25], "CSF INTERNO": [0, 30, 70], "CSF AJUDA": [0, 30, 70], "CSF QUALITY": [0, 40, 60]}
                 resumo_dimensoes = {"RE": ["35%", "40%", "25%"], "CSF INTERNO": ["0%", "30%", "70%"], "CSF AJUDA": ["0%", "30%", "70%"], "CSF QUALITY": ["0%", "40%", "60%"]}
