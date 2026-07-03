@@ -70,58 +70,55 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- ARQUITETURA DE MATRIZ DE PESOS EVOLUTIVA ---
+# --- DETERMINAÇÃO DAS ERAS DA OPERAÇÃO ---
 mes_nome = competencia.split(" / ")[0].lower()
 ano_nome = competencia.split(" / ")[1]
 
 is_era_unificada_csf = (ano_nome == "2025") or (ano_nome == "2026" and mes_nome in ["janeiro", "fevereiro", "março", "marco"])
 has_csf_ajuda = (ano_nome == "2026" and mes_nome in ["junho", "julho"])
 
-pesos_ativos = {ind: {cl: "-" for cl in clusters_totais} for ind in ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]}
+pesos_padrao = {
+    "CSAT": {"RE": "35%", "MONO": "35%", "MULTI": "30%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
+    "TMA / TMT": {"RE": "30%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "30%", "CSF AJUDA": "0%", "CSF QUALITY": "30%"},
+    "Improcedência Devida": {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "30%", "CSF QUALITY": "10%"},
+    "Nota de Monitoria": {"RE": "25%", "MONO": "25%", "MULTI": "15%", "CSF INTERNO": "45%", "CSF AJUDA": "50%", "CSF QUALITY": "45%"},
+    "Aderência à Escala": {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "0%"},
+    "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
+}
 
-if "julho" in mes_nome and "2026" in ano_nome:
-    pesos_ativos["CSAT"] = {"RE": "35%", "MONO": "35%", "MULTI": "30%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"}
-    pesos_ativos["TMA / TMT"] = {"RE": "30%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "30%", "CSF AJUDA": "0%", "CSF QUALITY": "30%"}
-    pesos_ativos["Improcedência Devida"] = {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "30%", "CSF QUALITY": "10%"}
-    pesos_ativos["Nota de Monitoria"] = {"RE": "25%", "MONO": "25%", "MULTI": "15%", "CSF INTERNO": "45%", "CSF AJUDA": "50%", "CSF QUALITY": "45%"}
-    pesos_ativos["Aderência à Escala"] = {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "0%"}
-    pesos_ativos["Evasão de Pausas"] = {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
-else:
-    pesos_ativos["CSAT"] = {"RE": "35%", "MONO": "40%", "MULTI": "35%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"}
-    pesos_ativos["TMA / TMT"] = {"RE": "35%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "35%", "CSF AJUDA": "0%", "CSF QUALITY": "35%"}
-    pesos_ativos["Improcedência Devida"] = {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "10%"}
-    pesos_ativos["Nota de Monitoria"] = {"RE": "20%", "MONO": "20%", "MULTI": "10%", "CSF INTERNO": "40%", "CSF AJUDA": "0%", "CSF QUALITY": "40%"}
-    pesos_ativos["Aderência à Escala"] = {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
-    pesos_ativos["Evasão de Pausas"] = {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"}
+if not ("julho" in mes_nome and "2026" in ano_nome):
+    pesos_padrao = {
+        "CSAT": {"RE": "35%", "MONO": "40%", "MULTI": "35%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
+        "TMA / TMT": {"RE": "35%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "35%", "CSF AJUDA": "0%", "CSF QUALITY": "35%"},
+        "Improcedência Devida": {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "25%", "CSF QUALITY": "10%"},
+        "Nota de Monitoria": {"RE": "20%", "MONO": "20%", "MULTI": "10%", "CSF INTERNO": "40%", "CSF AJUDA": "55%", "CSF QUALITY": "40%"},
+        "Aderência à Escala": {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "15%"},
+        "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"}
+    }
 
-    if "junho" in mes_nome:
-        pesos_ativos["Improcedência Devida"]["CSF AJUDA"] = "30%"
-        pesos_ativos["Nota de Monitoria"]["CSF AJUDA"] = "50%"
-        pesos_ativos["Aderência à Escala"]["CSF AJUDA"] = "20%"
-        
-    if ano_nome == "2026" and mes_nome in ["abril", "maio", "junho"]:
-        pesos_ativos["Aderência à Escala"]["CSF QUALITY"] = "0%"
-        pesos_ativos["Evasão de Pausas"]["CSF QUALITY"] = "15%"
+if ano_nome == "2026" and mes_nome in ["abril", "maio", "junho", "julho"]:
+    pesos_padrao["Aderência à Escala"]["CSF QUALITY"] = "0%"
+    pesos_padrao["Evasão de Pausas"]["CSF QUALITY"] = "15%"
 
 # --- LEITURA DO CSV ---
 try:
     df_raw = pd.read_csv("metas.csv", header=None, sep=None, engine='python')
 
-    # 1. LOCALIZADOR DE BLOCOS ULTRA-FLEXÍVEL (Ignora barras ou espaços)
+    # 1. LOCALIZADOR DE BLOCOS FLEXÍVEL
     idx_inicio = -1
     idx_fim = len(df_raw)
     
     target_token = mes_nome.replace("ç", "c").strip()
     
     for idx, row in df_raw.iterrows():
-        c0_clean = str(row.iloc[0]).strip().lower().replace("/", " ").replace("ç", "c")
+        c0_clean = str(row.iloc[0]).strip().lower().replace("ç", "c")
         if target_token in c0_clean and ano_nome in c0_clean:
             idx_inicio = idx
             break
             
     if idx_inicio != -1:
         for idx in range(idx_inicio + 1, len(df_raw)):
-            c0_clean = str(df_raw.iloc[idx, 0]).strip().lower().replace("/", " ").replace("ç", "c")
+            c0_clean = str(df_raw.iloc[idx, 0]).strip().lower().replace("ç", "c")
             meses_stop = ["janeiro", "fevereiro", "março", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro", "histórico", "↓"]
             if any(m in c0_clean for m in meses_stop) and idx > idx_inicio + 2:
                 idx_fim = idx
@@ -235,7 +232,7 @@ try:
 
             peso_val = "-"
             if meta_html != "-":
-                peso_val = pesos_ativos[indicador].get(cluster, "-")
+                peso_val = pesos_padrao[indicador].get(cluster, "-")
             
             if peso_val == "0%": peso_val = "-"
             
@@ -292,7 +289,7 @@ try:
         st.divider()
 
         st.subheader("📊 Campo Comparativo: Visão Gráfica da Arquitetura de Pesos")
-        valores_csat = [pesos_sincronizados_grafico["CSAT"][c] for c in clusters_filtrados]
+        valores_csat = [valores_csat[c] for c in range(len(clusters_filtrados))] if 'valores_csat' in locals() and isinstance(valores_csat, dict) else [pesos_sincronizados_grafico["CSAT"][c] for c in clusters_filtrados]
         valores_eficiencia = [pesos_sincronizados_grafico["TMA / TMT"][c] + pesos_sincronizados_grafico["Improcedência Devida"][c] for c in clusters_filtrados]
         valores_disciplina = [pesos_sincronizados_grafico["Nota de Monitoria"][c] + pesos_sincronizados_grafico["Aderência à Escala"][c] + pesos_sincronizados_grafico["Evasão de Pausas"][c] for c in clusters_filtrados]
 
