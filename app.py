@@ -67,7 +67,7 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- DICIONÁRIOS DE PESOS DE CONTINGÊNCIA (PLANO B) ---
+# --- DICIONÁRIOS DE PESOS DE CONTINGÊNCIA (PLANO B CORRIGIDO) ---
 mes_procurado = competencia.split(" / ")[0].lower()
 
 pesos_padrao = {}
@@ -81,16 +81,17 @@ if "julho" in mes_procurado:
         "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
     }
 else:
+    # Histórico Corrigido: Quality com 15% na Aderência (e não Evasão) nos meses passados
     pesos_padrao = {
         "CSAT": {"RE": "35%", "MONO": "40%", "MULTI": "35%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
         "TMA / TMT": {"RE": "35%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "35%", "CSF AJUDA": "0%", "CSF QUALITY": "35%"},
         "Improcedência Devida": {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "25%", "CSF QUALITY": "10%"},
         "Nota de Monitoria": {"RE": "20%", "MONO": "20%", "MULTI": "10%", "CSF INTERNO": "40%", "CSF AJUDA": "55%", "CSF QUALITY": "40%"},
-        "Aderência à Escala": {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "0%"},
-        "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
+        "Aderência à Escala": {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "15%"},
+        "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"}
     }
 
-# --- LEITURA E PROCESSAMENTO ULTRA-INTELIGENTE DO CSV ---
+# --- LEITURA E PROCESSAMENTO ULTRA-BLINDADO DO CSV ---
 try:
     try:
         df_raw = pd.read_csv("metas.csv", header=None, sep=';')
@@ -98,47 +99,62 @@ try:
     except:
         df_raw = pd.read_csv("metas.csv", header=None, sep=',')
 
-    # 1. RADAR GLOBAL DE COLUNAS (Sem freio limitador! Varre até o final da linha)
-    map_cols = {}
-    for idx, row in df_raw.iterrows():
-        linha_upper = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
-        if "RE" in linha_upper and ("MONO" in linha_upper or "CSF INTERNO" in linha_upper or "INTERNO" in linha_upper):
-            for i, val in enumerate(linha_upper):
-                if val == "RE" or val == "R.E": map_cols["RE"] = i
-                elif "MONO" in val or "CRC MONO" in val: map_cols["MONO"] = i
-                elif "MULTI" in val or "CRC MULTI" in val: map_cols["MULTI"] = i
-                elif "INTERNO" in val or "CSF INTERNO" in val: map_cols["CSF INTERNO"] = i
-                elif "AJUDA" in val or "CSF AJUDA" in val: map_cols["CSF AJUDA"] = i
-                elif "QUALITY" in val or "CSF QUALITY" in val: map_cols["CSF QUALITY"] = i
-            break # Trava o mapeamento APÓS verificar toda a linha
-
-    # Fallback dinâmico seguro
-    if not map_cols:
-        map_cols = {"RE": 2, "CSF INTERNO": 3, "CSF AJUDA": 4, "CSF QUALITY": 5, "MONO": 6, "MULTI": 7}
-
-    # 2. LOCALIZADOR FLEXÍVEL DE BLOCOS DE MESES
+    # 1. LOCALIZADOR BLINDADO DE BLOCOS (Evita cortes prematuros)
     idx_inicio = -1
     idx_fim = len(df_raw)
     
     for idx, row in df_raw.iterrows():
-        txt_linha = " ".join([str(x).strip().lower() for x in row.iloc[0:4] if pd.notna(x)])
-        if mes_procurado in txt_linha:
+        c0 = str(row.iloc[0]).strip().lower() if pd.notna(row.iloc[0]) else ""
+        if mes_procurado in c0:
             idx_inicio = idx
             break
             
     if idx_inicio != -1:
         for idx in range(idx_inicio + 1, len(df_raw)):
-            txt_linha = " ".join([str(x).strip().lower() for x in df_raw.iloc[idx, 0:4] if pd.notna(x)])
-            meses_stop = ["janeiro", "fevereiro", "março", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro", "histórico", "↓"]
-            if any(m in txt_linha for m in meses_stop) and mes_procurado not in txt_linha:
+            # Verifica apenas a Coluna 0 para gatilho de parada para não ser enganado por textos no meio da tabela
+            c0 = str(df_raw.iloc[idx, 0]).strip().lower() if pd.notna(df_raw.iloc[idx, 0]) else ""
+            meses_stop = ["janeiro", "fevereiro", "março", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "histórico", "↓"]
+            if any(m in c0 for m in meses_stop) and mes_procurado not in c0:
                 idx_fim = idx
                 break
                 
     linhas_bloco = df_raw.iloc[idx_inicio:idx_fim] if idx_inicio != -1 else pd.DataFrame()
 
-    # 3. EXTRATOR DE PESOS 100% ISOLADO POR MÊS
+    # 2. RADAR DE COLUNAS ASCENDENTE (O segredo para achar Mono e Multi em meses sem cabeçalho)
+    map_cols = {}
+    
+    def mapear_linha(row_data):
+        m_cols = {}
+        row_str = [str(x).upper().strip() if pd.notna(x) else "" for x in row_data]
+        if "RE" in row_str or "R.E" in row_str:
+            for i, val in enumerate(row_str):
+                if val == "RE" or val == "R.E": m_cols["RE"] = i
+                elif "MONO" in val or "CRC MONO" in val: m_cols["MONO"] = i
+                elif "MULTI" in val or "CRC MULTI" in val: m_cols["MULTI"] = i
+                elif "INTERNO" in val or "CSF INTERNO" in val: m_cols["CSF INTERNO"] = i
+                elif "AJUDA" in val or "CSF AJUDA" in val: m_cols["CSF AJUDA"] = i
+                elif "QUALITY" in val or "CSF QUALITY" in val: m_cols["CSF QUALITY"] = i
+        return m_cols
+
+    # Tenta achar o cabeçalho DENTRO do mês
+    for idx, row in linhas_bloco.iterrows():
+        map_cols = mapear_linha(row)
+        if len(map_cols) > 0: break
+
+    # Se NÃO achou no mês, escaneia o arquivo para CIMA a partir do mês até achar o cabeçalho original!
+    if not map_cols and idx_inicio > 0:
+        for i in range(idx_inicio, -1, -1):
+            map_cols = mapear_linha(df_raw.iloc[i])
+            if len(map_cols) > 0: break
+
+    # Se a planilha estiver totalmente sem cabeçalho (Improvável)
+    if not map_cols:
+        map_cols = {"RE": 2, "MONO": 3, "MULTI": 4, "CSF INTERNO": 5, "CSF AJUDA": 6, "CSF QUALITY": 7}
+
+    # 3. EXTRATOR DINÂMICO DE PESOS (Com Plano B acoplado)
     oficiais = ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]
     pesos_ativos = {ind: {cl: "-" for cl in clusters_totais} for ind in oficiais}
+    achou_pesos_no_arquivo = False
     
     map_terms = {
         "CSAT": ["CSAT", "SATISFAÇÃO", "SATISFACAO"],
@@ -149,40 +165,30 @@ try:
         "Evasão de Pausas": ["EVASÃO", "EVASAO", "PAUSAS"]
     }
 
-    def carregar_pesos_do_bloco(lista_rows):
-        achou = False
-        for row_data in lista_rows:
-            row_str = " ".join([str(x).upper() for x in row_data if pd.notna(x)])
-            if "PONDERAÇÃO" in row_str or "PESOS" in row_str or "PESO" in row_str:
-                achou = True
-                for cl, i_col in map_cols.items():
-                    if len(row_data) > i_col and pd.notna(row_data.iloc[i_col]):
-                        cell_text = str(row_data.iloc[i_col]).upper()
-                        for ind, terms in map_terms.items():
-                            for term in terms:
-                                pattern = re.escape(term) + r'.{0,35}?(\d+(?:[.,]\d+)?)\s*%'
-                                match = re.search(pattern, cell_text)
-                                if match:
-                                    v = match.group(1).replace(",", ".")
-                                    if v.endswith(".0"): v = v[:-2]
-                                    pesos_ativos[ind][cl] = v + "%"
-                                    break
-                break
-        return achou
+    # Procura a Ponderação APENAS dentro do bloco do mês
+    for idx, row in linhas_bloco.iterrows():
+        row_str = " ".join([str(x).upper() for x in row if pd.notna(x)])
+        if "PONDERAÇÃO" in row_str or "PESOS" in row_str or "PESO" in row_str:
+            achou_pesos_no_arquivo = True
+            for cl, i_col in map_cols.items():
+                if len(row) > i_col and pd.notna(row.iloc[i_col]):
+                    cell_text = str(row.iloc[i_col]).upper()
+                    for ind, terms in map_terms.items():
+                        for term in terms:
+                            pattern = re.escape(term) + r'.{0,35}?(\d+(?:[.,]\d+)?)\s*%'
+                            match = re.search(pattern, cell_text)
+                            if match:
+                                v = match.group(1).replace(",", ".")
+                                if v.endswith(".0"): v = v[:-2]
+                                pesos_ativos[ind][cl] = v + "%"
+                                break
+            break
 
-    bloco_list = [r for _, r in linhas_bloco.iterrows()] if not linhas_bloco.empty else []
-    
-    # ATENÇÃO: Se não achar no bloco específico do mês, não busca no arquivo inteiro!
-    # Isso evita puxar a ponderação errada de Junho para a matriz de Janeiro/Abril.
-    carregar_pesos_do_bloco(bloco_list)
+    # Se não achou pesos no CSV, preenche com o padrão histórico ajustado para não zerar gráficos
+    if not achou_pesos_no_arquivo:
+        pesos_ativos = pesos_padrao
 
-    # Força a matriz base corporativa caso o peso esteja nulo no mês
-    for ind in oficiais:
-        for cl in clusters_totais:
-            if pesos_ativos[ind][cl] == "-" or pesos_ativos[ind][cl] == "0%" or pesos_ativos[ind][cl] == "":
-                pesos_ativos[ind][cl] = pesos_padrao[ind].get(cl, "-")
-
-    # 4. EXTRATOR MESTRE DE METAS
+    # 4. EXTRATOR MESTRE DE METAS (Com fusão das colunas 0, 1 e 2 para não perder Maio)
     matriz_final = {ind: {cl: {"base": "-", "fone": "-", "dig": "-", "q1": "-"} for cl in clusters_totais} for ind in oficiais}
     current_pAI = None
     
@@ -194,7 +200,8 @@ try:
         return "-"
 
     for idx, row in linhas_bloco.iterrows():
-        nome_linha = " ".join([str(x).upper().strip() for x in row.iloc[0:2] if pd.notna(x)])
+        # Lendo 3 colunas para o nome da linha, garantindo que o texto CSAT não fuja
+        nome_linha = " ".join([str(x).upper().strip() for x in row.iloc[0:3] if pd.notna(x)])
         
         if "METAS" in nome_linha or "PONDERAÇÃO" in nome_linha or "FAIXAS" in nome_linha or "INDICADOR" in nome_linha:
             continue
@@ -222,7 +229,7 @@ try:
                     matriz_final[current_pAI][cl]["base"] = val
 
     # ==============================================================================
-    # QUADRO 1: MATRIZ DE INDICADORES
+    # QUADRO 1: MATRIZ DE INDICADORES (CONSTRUÇÃO VISUAL)
     # ==============================================================================
     st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
     
