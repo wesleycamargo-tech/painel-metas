@@ -64,12 +64,19 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- LEITURA DIRETA E SEGURA ---
+# --- LEITURA INTELIGENTE DO CSV ---
 try:
-    df_raw = pd.read_csv("metas.csv", header=None)
+    # Testa primeiro se o CSV usa ponto e vírgula (;), se falhar usa vírgula (,)
+    try:
+        df_raw = pd.read_csv("metas.csv", header=None, sep=';')
+        if df_raw.shape[1] <= 1:
+            raise ValueError
+    except:
+        df_raw = pd.read_csv("metas.csv", header=None, sep=',')
+
     mes_procurado = "julho" if "Julho" in competencia else "junho"
     
-    # 1. Busca flexível pela linha do mês
+    # 1. Localiza a linha inicial do mês
     idx_inicio = None
     for idx, row in df_raw.iterrows():
         txt = str(row.iloc[0]).strip().lower()
@@ -79,16 +86,14 @@ try:
 
     if idx_inicio is None:
         st.error(f"Não localizamos o marcador '{mes_procurado}' na primeira coluna do arquivo metas.csv.")
-        st.info("Linhas disponíveis na primeira coluna para diagnóstico:")
-        st.write(df_raw.iloc[:, 0].dropna().head(20).tolist())
     else:
-        # 2. Captura sequencial direta sem filtros agressivos
+        # 2. Captura sequencial das linhas de dados abaixo do cabeçalho do mês
         linhas_validas = []
         for i in range(idx_inicio + 1, len(df_raw)):
             row = df_raw.iloc[i]
             val_primeiro = str(row.iloc[0]).strip()
             
-            # Condição de parada flexível ao alcançar outro mês ou seção histórica
+            # Condição de parada flexível ao alcançar outra seção ou fim de bloco
             if i > (idx_inicio + 2) and (
                 ("junho" in val_primeiro.lower() and mes_procurado == "julho") or 
                 ("julho" in val_primeiro.lower() and mes_procurado == "junho") or 
@@ -98,24 +103,23 @@ try:
             ):
                 break
                 
-            # Remove linhas puramente em branco
+            # Remove linhas puramente nulas ou vazias
             if val_primeiro == "nan" or val_primeiro == "":
                 continue
                 
             linhas_validas.append(row)
 
         if len(linhas_validas) == 0:
-            st.error(f"O bloco contendo '{mes_procurado}' foi achado na linha {idx_inicio}, mas nenhuma linha de dados válida estava logo abaixo dele.")
+            st.error(f"O bloco '{mes_procurado}' foi achado na linha {idx_inicio}, mas as linhas seguintes vieram vazias ou sem estrutura tratável.")
         else:
-            # 3. Monta o DataFrame
+            # 3. Formatação do DataFrame recortado
             df_mes = pd.DataFrame(linhas_validas)
-            df_mes = df_mes.dropna(how='all', axis=1) # Remove colunas fantasmas à direita
+            df_mes = df_mes.dropna(how='all', axis=1) # Limpa colunas fantasmas à direita
             
-            # Define o padrão de colunas corporativas padrão fixas
+            # Define estaticamente o cabeçalho correto para parear com a estrutura da planilha
             colunas_completas = ["INDICADOR", "RE", "CSF INTERNO", "CSF AJUDA", "CSF QUALITY"]
             qtd_cols_reais = df_mes.shape[1]
             
-            # Ajusta dinamicamente os nomes das colunas baseado nas colunas que o CSV gerou
             df_mes.columns = [colunas_completas[i] if i < len(colunas_completas) else f"COL_{i}" for i in range(qtd_cols_reais)]
 
             # ==============================================================================
@@ -144,8 +148,8 @@ try:
                 indicador_nome = str(row.iloc[0]).strip()
                 indicador_upper = indicador_nome.upper()
                 
-                # Pula linhas de títulos estruturais remanescentes
-                if "METAS -" in indicador_upper or "PONDERAÇÃO" in indicador_upper or "FAIXAS" in indicador_upper:
+                # Ignora cabeçalhos de texto repetidos que possam ter vindo do arquivo original
+                if "METAS -" in indicador_upper or "PONDERAÇÃO" in indicador_upper or "FAIXAS" in indicador_upper or "CSF INTERNO" in indicador_upper or "INDICADOR" in indicador_upper:
                     continue
                 
                 icone = "🔹 "
