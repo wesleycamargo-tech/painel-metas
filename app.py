@@ -91,7 +91,7 @@ else:
         "TMA / TMT": {"RE": "35%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "35%", "CSF AJUDA": "0%", "CSF QUALITY": "35%"},
         "Improcedência Devida": {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "25%", "CSF QUALITY": "10%"},
         "Nota de Monitoria": {"RE": "20%", "MONO": "20%", "MULTI": "10%", "CSF INTERNO": "40%", "CSF AJUDA": "55%", "CSF QUALITY": "40%"},
-        "Aderência à Escala": {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "15%"}, # O padrão até Março
+        "Aderência à Escala": {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "15%"},
         "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"}
     }
 
@@ -129,30 +129,36 @@ try:
                 
     linhas_bloco = df_raw.iloc[idx_inicio:idx_fim] if idx_inicio != -1 else pd.DataFrame()
 
-    # 2. RADAR OPERACIONAL DE CABEÇALHOS (Scanner Multilinha)
+    # 2. RADAR OPERACIONAL DE CABEÇALHOS (Scanner Profundo sem freio)
     map_cols = {}
     for idx in range(max(0, idx_inicio - 1), min(len(df_raw), idx_fim)):
         row = df_raw.iloc[idx]
         row_str = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
-        if any(c in row_str for c in ["RE", "CAR", "C.A.R.", "CSF", "MONO", "INTERNO"]):
-            for i, val in enumerate(row_str):
-                if val in ["RE", "R.E", "R.E.", "CAR", "C.A.R.", "C.A.R"]: map_cols["RE"] = i
-                elif "MONO" in val or "CRC MONO" in val: map_cols["MONO"] = i
-                elif "MULTI" in val or "CRC MULTI" in val: map_cols["MULTI"] = i
-                elif "INTERNO" in val or "CSF INTERNO" in val: map_cols["CSF INTERNO"] = i
-                elif "AJUDA" in val or "CSF AJUDA" in val: map_cols["CSF AJUDA"] = i
-                elif "QUALITY" in val or "CSF QUALITY" in val: map_cols["CSF QUALITY"] = i
-                elif "CSF" in val: map_cols["CSF_GENERICO"] = i
-            
-            if "CSF_GENERICO" in map_cols:
-                if "CSF INTERNO" not in map_cols: map_cols["CSF INTERNO"] = map_cols["CSF_GENERICO"]
-                if "CSF QUALITY" not in map_cols: map_cols["CSF QUALITY"] = map_cols["CSF_GENERICO"]
+        txt_full = " ".join(row_str)
+        
+        # O Radar só para de procurar colunas na hora que bate nos dados reais (evita perder colunas mescladas abaixo)
+        if any(c in txt_full for c in ["CSAT", "SATISFAÇÃO", "SATISFACAO", "TMA", "IMPROCEDÊNCIA", "IMPROCEDENCIA", "METAS", "PONDERAÇÃO"]):
             break
+            
+        for i, val in enumerate(row_str):
+            if not val: continue
+            if val in ["RE", "R.E", "R.E.", "CAR", "C.A.R.", "C.A.R"]: map_cols["RE"] = i
+            elif "MONO" in val or "CRC MONO" in val: map_cols["MONO"] = i
+            elif "MULTI" in val or "CRC MULTI" in val: map_cols["MULTI"] = i
+            elif "INTERNO" in val or "CSF INTERNO" in val: map_cols["CSF INTERNO"] = i
+            elif "AJUDA" in val or "CSF AJUDA" in val: map_cols["CSF AJUDA"] = i
+            elif "QUALITY" in val or "CSF QUALITY" in val: map_cols["CSF QUALITY"] = i
+            elif val == "CSF": map_cols["CSF_GENERICO"] = i
+            
+    # Tratamento Histórico: Clona a coluna unificada CSF para Interno e Quality se não tiverem sido achados separadamente
+    if "CSF_GENERICO" in map_cols:
+        if "CSF INTERNO" not in map_cols: map_cols["CSF INTERNO"] = map_cols["CSF_GENERICO"]
+        if "CSF QUALITY" not in map_cols: map_cols["CSF QUALITY"] = map_cols["CSF_GENERICO"]
 
     if not map_cols:
         map_cols = {"RE": 2, "MONO": 3, "MULTI": 4, "CSF INTERNO": 5, "CSF AJUDA": 6, "CSF QUALITY": 7}
 
-    # 3. EXTRAÇÃO DE PESOS DA COMPETÊNCIA (Com Máquina do Tempo Integrada)
+    # 3. EXTRAÇÃO DE PESOS DA COMPETÊNCIA
     oficiais = ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]
     pesos_ativos = {ind: {cl: "-" for cl in clusters_totais} for ind in oficiais}
     achou_pesos_no_arquivo = False
