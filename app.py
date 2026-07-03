@@ -46,7 +46,6 @@ filtro_macro = st.sidebar.radio(
     ["Ver Todas as Clusters", "CRC (MONO + MULTI)", "RE", "CSF (Interno, Ajuda, Quality)"]
 )
 
-# Mapeamento dos clusters ativos na visualização
 clusters_totais = ["RE", "MONO", "MULTI", "CSF INTERNO", "CSF AJUDA", "CSF QUALITY"]
 if filtro_macro == "CRC (MONO + MULTI)":
     clusters_filtrados = ["MONO", "MULTI"]
@@ -67,7 +66,7 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- PROCESSAMENTO 100% DINÂMICO DO CSV ---
+# --- REVISÃO DA LEITURA DO CSV ---
 try:
     try:
         df_raw = pd.read_csv("metas.csv", header=None, sep=';')
@@ -77,66 +76,77 @@ try:
 
     mes_procurado = competencia.split(" / ")[0].lower()
     
-    # 1. Isola e varre o arquivo identificando em qual bloco de linhas o mês está posicionado
-    linhas_mes = []
+    # 1. Captura o bloco bruto de linhas do mês correspondente
+    linhas_bloco = []
     capturando = False
     
     for idx, row in df_raw.iterrows():
         col_a = str(row.iloc[0]).strip().lower() if pd.notna(row.iloc[0]) else ""
-        col_b = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ""
-        
         if mes_procurado in col_a:
             capturando = True
             continue
         elif capturando and col_a != "" and any(m in col_a for m in ["julho", "junho", "maio", "abril", "março", "fevereiro", "janeiro", "histórico", "↓"]):
             capturando = False
             break
-            
-        if capturando and col_b != "" and col_b != "nan":
-            linhas_mes.append(row)
+        if capturando:
+            linhas_bloco.append(row)
 
-    # 2. Consolidação inteligente: Agrupa sublinhas (Fone, Digital, Q1) sob o indicador pai
-    indicadores_consolidados = {}
+    # 2. Estrutura de Dicionário Limpo para os 6 Indicadores Oficiais
+    oficiais = ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]
+    matriz_final = {ind: {cl: "-" for cl in clusters_totais} for ind in oficiais}
     
-    for row in linhas_mes:
-        nome_bruto = str(row.iloc[1]).strip()
-        nome_upper = nome_bruto.upper()
+    # Função auxiliar segura para extrair valores das colunas do CSV (C=2, D=3, E=4, F=5, G=6, H=7)
+    def pegar_val(r, cl_idx):
+        if len(r) > cl_idx and pd.notna(r.iloc[cl_idx]):
+            v = str(r.iloc[cl_idx]).strip()
+            return "-" if v.lower() in ["nan", "", "sem meta"] else v
+        return "-"
+
+    # 3. Varredura Posicional Inteligente das linhas capturadas no CSV
+    for row in linhas_bloco:
+        col_b = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ""
+        col_b_upper = col_b.upper()
         
-        if "METAS" in nome_upper or "PONDERAÇÃO" in nome_upper or "FAIXAS" in nome_upper or "INDICADOR" in nome_upper:
+        # Ignora linhas de títulos ou divisores
+        if col_b == "" or "METAS" in col_b_upper or "INDICADOR" in col_b_upper or "PONDERAÇÃO" in col_b_upper or "FAIXAS" in col_b_upper:
             continue
             
-        # Define a qual indicador principal essa sublinha pertence
-        pAI = "CSAT" if "CSAT" in nome_upper else (
-              "TMA / TMT" if "TMA" in nome_upper or "TMT" in nome_upper else (
-              "Improcedência Devida" if "IMPROCEDÊNCIA" in nome_upper else (
-              "Nota de Monitoria" if "MONITORIA" in nome_upper else (
-              "Aderência à Escala" if "ADERÊNCIA" in nome_upper or "ESCALA" in nome_upper else (
-              "Evasão de Pausas" if "EVASÃO" in nome_upper or "PAUSAS" in nome_upper else nome_bruto)))))
-
-        if pAI not in indicadores_consolidados:
-            indicadores_consolidados[pAI] = {"RE": "", "MONO": "", "MULTI": "", "CSF INTERNO": "", "CSF AJUDA": "", "CSF QUALITY": ""}
-            
-        # Posições das colunas: C=2 (RE), D=3 (MONO), E=4 (MULTI), F=5 (CSF INT), G=6 (CSF AJU), H=7 (CSF QUA)
-        map_idx = {"RE": 2, "MONO": 3, "MULTI": 4, "CSF INTERNO": 5, "CSF AJUDA": 6, "CSF QUALITY": 7}
+        # Identificação robusta do Indicador Alvo
+        target_ind = None
+        if "CSAT" in col_b_upper: target_ind = "CSAT"
+        elif "TMA" in col_b_upper or "TMT" in col_b_upper: target_ind = "TMA / TMT"
+        elif "IMPROCEDÊNCIA" in col_b_upper: target_ind = "Improcedência Devida"
+        elif "MONITORIA" in col_b_upper: target_ind = "Nota de Monitoria"
+        elif "ADERÊNCIA" in col_b_upper or "ESCALA" in col_b_upper: target_ind = "Aderência à Escala"
+        elif "EVASÃO" in col_b_upper or "PAUSAS" in col_b_upper: target_ind = "Evasão de Pausas"
         
-        for cl, col_pos in map_idx.items():
-            val = str(row.iloc[col_pos]).strip() if len(row) > col_pos and pd.notna(row.iloc[col_pos]) else "-"
-            if val == "nan" or val == "": val = "-"
+        if target_ind:
+            map_cols = {"RE": 2, "MONO": 3, "MULTI": 4, "CSF INTERNO": 5, "CSF AJUDA": 6, "CSF QUALITY": 7}
             
-            # Se for linha de detalhamento (Fone, Digital, Q1), concatena na célula de forma organizada
-            if "Q1" in nome_upper:
-                if val != "-": indicadores_consolidados[pAI][cl] += f"<br><small class='meta-muted-gray'>Q1: {val}</small>"
-            elif "FONE" in nome_upper:
-                if val != "-": indicadores_consolidados[pAI][cl] += f"Fone: {val}"
-            elif "DIGITAL" in nome_upper or "DIG" in nome_upper:
-                if val != "-":
-                    prefixo = " / " if "Fone:" in indicadores_consolidados[pAI][cl] else ""
-                    indicadores_consolidados[pAI][cl] += f"{prefixo}Dig: {val}"
-            else:
-                if val != "-": indicadores_consolidados[pAI][cl] = val
+            for cl, idx_col in map_cols.items():
+                val_raw = pegar_val(row, idx_col)
+                
+                # Regras de Consolidação Visual para Fone, Digital e Q1 na mesma célula
+                if "Q1" in col_b_upper:
+                    if val_raw != "-":
+                        if matriz_final[target_ind][cl] == "-": matriz_final[target_ind][cl] = ""
+                        matriz_final[target_ind][cl] += f"<br><small class='meta-muted-gray'>Q1: {val_raw}</small>"
+                elif "FONE" in col_b_upper:
+                    if val_raw != "-":
+                        if matriz_final[target_ind][cl] == "-": matriz_final[target_ind][cl] = ""
+                        matriz_final[target_ind][cl] += f"Fone: {val_raw}"
+                elif "DIGITAL" in col_b_upper or "DIG" in col_b_upper:
+                    if val_raw != "-":
+                        if matriz_final[target_ind][cl] == "-": matriz_final[target_ind][cl] = ""
+                        separador = " / " if "Fone:" in matriz_final[target_ind][cl] else ""
+                        matriz_final[target_ind][cl] += f"{separador}Dig: {val_raw}"
+                else:
+                    # Linha base regular (se já tiver conteúdo de fone/digital, não sobrescreve)
+                    if val_raw != "-" and ("Fone:" not in matriz_final[target_ind][cl]):
+                        matriz_final[target_ind][cl] = val_raw
 
     # ==============================================================================
-    # QUADRO 1: MATRIZ DINÂMICA COMPLETA DO CSV
+    # QUADRO 1: MATRIZ DE INDICADORES CONSOLIDADA
     # ==============================================================================
     st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
     
@@ -148,9 +158,7 @@ try:
         html_tabela += '<th>Meta</th><th>Peso</th>'
     html_tabela += '</tr></thead><tbody>'
 
-    icones = {"CSAT": "💻 ", "TMA / TMT": "⏱️ ", "Improcedência Devida": "🚫 ", "Nota de Monitoria": "🎧 ", "Aderência à Escala": "📅 ", "Evasão de Pausas": "🛑 "}
-
-    # Definição matemática de Pesos Fixos das Dimensões para os Pilares do Mês
+    # Definição dinâmica de pesos regulamentares das dimensões
     if "julho" in mes_procurado:
         grafico_pesos = {"RE": [35, 40, 25], "MONO": [35, 40, 25], "MULTI": [30, 40, 30], "CSF INTERNO": [0, 30, 70], "CSF AJUDA": [0, 30, 70], "CSF QUALITY": [0, 40, 60]}
         resumo_dimensoes = {"RE": ["35%", "40%", "25%"], "MONO": ["35%", "40%", "25%"], "MULTI": ["30%", "40%", "30%"], "CSF INTERNO": ["0%", "30%", "70%"], "CSF AJUDA": ["0%", "30%", "70%"], "CSF QUALITY": ["0%", "40%", "60%"]}
@@ -158,15 +166,16 @@ try:
         grafico_pesos = {"RE": [35, 45, 20], "MONO": [40, 40, 20], "MULTI": [35, 40, 25], "CSF INTERNO": [0, 35, 65], "CSF AJUDA": [0, 25, 75], "CSF QUALITY": [0, 45, 55]}
         resumo_dimensoes = {"RE": ["35%", "45%", "20%"], "MONO": ["40%", "40%", "20%"], "MULTI": ["35%", "40%", "25%"], "CSF INTERNO": ["0%", "35%", "65%"], "CSF AJUDA": ["0%", "25%", "75%"], "CSF QUALITY": ["0%", "45%", "55%"]}
 
-    for indicador, valores in indicadores_consolidados.items():
-        icone = icones.get(indicador, "🔹 ")
-        html_tabela += f'<tr><td style="text-align: left !important; padding-left: 15px;"><b>{icone}{indicador}</b></td>'
+    icones = {"CSAT": "💻 ", "TMA / TMT": "⏱️ ", "Improcedência Devida": "🚫 ", "Nota de Monitoria": "🎧 ", "Aderência à Escala": "📅 ", "Evasão de Pausas": "🛑 "}
+
+    for indicador in oficiais:
+        html_tabela += f'<tr><td style="text-align: left !important; padding-left: 15px;"><b>{icones[indicador]}{indicador}</b></td>'
         
         for cluster in clusters_filtrados:
-            meta_val = valores.get(cluster, "").strip()
-            if meta_val == "": meta_val = "-"
+            meta_val = matriz_final[indicador].get(cluster, "-").strip()
+            if meta_val == "" or meta_val == "nan": meta_val = "-"
             
-            # Cálculo e posicionamento das fatias de peso corporativo
+            # Amarração fixa da régua de pesos corporativos
             peso_val = "-"
             if "CSAT" in indicador: peso_val = "35%" if cluster in ["RE", "MONO"] else ("30%" if cluster == "MULTI" else "0%")
             elif "TMA" in indicador: peso_val = "30%" if cluster != "CSF AJUDA" else "0%"
@@ -175,7 +184,9 @@ try:
             elif "ADERÊNCIA" in indicador.upper(): peso_val = "15%" if cluster == "MULTI" else ("25%" if cluster == "CSF INTERNO" else ("20%" if cluster == "CSF AJUDA" else "0%"))
             elif "EVASÃO" in indicador.upper(): peso_val = "15%" if cluster == "CSF QUALITY" else "0%"
 
-            if meta_val == "-":
+            # Formatação visual de inativos ou células zeradas
+            if meta_val == "-" or "*** NÃO SEGUIRÁ" in meta_val.upper() or "INATIVO" in meta_val.upper():
+                meta_val = "-"
                 celula_meta = f'<td class="meta-muted-gray">{meta_val}</td>'
             elif "TMA" in indicador:
                 celula_meta = f'<td class="meta-tma-gray">{meta_val}</td>'
