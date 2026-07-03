@@ -11,7 +11,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilização Executiva Premium
+# Estilização Executiva Premium + Tratamento para logo quebrado
 st.markdown("""
     <style>
     .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; }
@@ -60,12 +60,35 @@ else:
 # --- TÍTULO DO PAINEL ---
 st.markdown("""
     <div class="header-container">
-        <img src="https://upload.wikimedia.org/wikipedia/pt/e/e9/Logotipo_Grupo_Botic%C3%A1rio.png" class="brand-logo">
+        <img src="https://upload.wikimedia.org/wikipedia/pt/e/e9/Logotipo_Grupo_Botic%C3%A1rio.png" onerror="this.style.display='none'" class="brand-logo">
         <h1 class="brand-title">Painel de Metas & Pesos CEX</h1>
     </div>
 """, unsafe_allow_html=True)
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
+
+# --- REDE DE SEGURANÇA: DICIONÁRIO DE PESOS HISTÓRICOS OFICIAIS ---
+mes_procurado = competencia.split(" / ")[0].lower()
+
+pesos_padrao = {}
+if "julho" in mes_procurado:
+    pesos_padrao = {
+        "CSAT": {"RE": "35%", "MONO": "35%", "MULTI": "30%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
+        "TMA / TMT": {"RE": "30%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "30%", "CSF AJUDA": "0%", "CSF QUALITY": "30%"},
+        "Improcedência Devida": {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "30%", "CSF QUALITY": "10%"},
+        "Nota de Monitoria": {"RE": "25%", "MONO": "25%", "MULTI": "15%", "CSF INTERNO": "45%", "CSF AJUDA": "50%", "CSF QUALITY": "45%"},
+        "Aderência à Escala": {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "0%"},
+        "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
+    }
+else:
+    pesos_padrao = {
+        "CSAT": {"RE": "35%", "MONO": "40%", "MULTI": "35%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
+        "TMA / TMT": {"RE": "35%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "35%", "CSF AJUDA": "0%", "CSF QUALITY": "35%"},
+        "Improcedência Devida": {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "25%", "CSF QUALITY": "10%"},
+        "Nota de Monitoria": {"RE": "20%", "MONO": "20%", "MULTI": "10%", "CSF INTERNO": "40%", "CSF AJUDA": "55%", "CSF QUALITY": "40%"},
+        "Aderência à Escala": {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "0%"},
+        "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
+    }
 
 # --- LEITURA E PROCESSAMENTO INTELIGENTE DO CSV ---
 try:
@@ -75,33 +98,13 @@ try:
     except:
         df_raw = pd.read_csv("metas.csv", header=None, sep=',')
 
-    mes_procurado = competencia.split(" / ")[0].lower()
-    
-    # 1. RADAR GLOBAL DE COLUNAS
-    map_cols = {}
-    for idx, row in df_raw.iterrows():
-        linha_upper = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
-        if "RE" in linha_upper and ("CSF INTERNO" in linha_upper or "CSF QUALITY" in linha_upper):
-            for i, val in enumerate(linha_upper):
-                if val == "RE": map_cols["RE"] = i
-                elif "MONO" in val or "CRC MONO" in val: map_cols["MONO"] = i
-                elif "MULTI" in val or "CRC MULTI" in val: map_cols["MULTI"] = i
-                elif "CSF INTERNO" in val or "INTERNO" in val: map_cols["CSF INTERNO"] = i
-                elif "CSF AJUDA" in val or "AJUDA" in val: map_cols["CSF AJUDA"] = i
-                elif "QUALITY" in val or "CSF QUALITY" in val: map_cols["CSF QUALITY"] = i
-            break
-
-    if not map_cols:
-        map_cols = {"RE": 2, "MONO": 3, "MULTI": 4, "CSF INTERNO": 5, "CSF AJUDA": 6, "CSF QUALITY": 7}
-
-    # 2. CAPTURA DO BLOCO DO MÊS
+    # 1. CAPTURA DO BLOCO DO MÊS
     linhas_bloco = []
     capturando = False
     
     for idx, row in df_raw.iterrows():
-        col_a = str(row.iloc[0]).strip().lower() if pd.notna(row.iloc[0]) else ""
-        col_b = str(row.iloc[1]).strip().lower() if len(row) > 1 and pd.notna(row.iloc[1]) else ""
-        txt_verif = col_a + " " + col_b
+        # Busca super flexível nas colunas iniciais
+        txt_verif = " ".join([str(x).strip().lower() for x in row.iloc[0:3] if pd.notna(x)])
         
         if mes_procurado in txt_verif:
             capturando = True
@@ -118,7 +121,24 @@ try:
                 
             linhas_bloco.append(row)
 
-    # 3. EXTRATOR DINÂMICO DE PESOS CORRIGIDO
+    # 2. RADAR GLOBAL DE COLUNAS
+    map_cols = {}
+    for row in linhas_bloco:
+        linha_upper = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
+        if "RE" in linha_upper and ("CSF INTERNO" in linha_upper or "CSF QUALITY" in linha_upper or "MONO" in linha_upper):
+            for i, val in enumerate(linha_upper):
+                if val == "RE": map_cols["RE"] = i
+                elif "MONO" in val or "CRC MONO" in val: map_cols["MONO"] = i
+                elif "MULTI" in val or "CRC MULTI" in val: map_cols["MULTI"] = i
+                elif "CSF INTERNO" in val or "INTERNO" in val: map_cols["CSF INTERNO"] = i
+                elif "CSF AJUDA" in val or "AJUDA" in val: map_cols["CSF AJUDA"] = i
+                elif "QUALITY" in val or "CSF QUALITY" in val: map_cols["CSF QUALITY"] = i
+            break
+
+    if not map_cols:
+        map_cols = {"RE": 2, "MONO": 3, "MULTI": 4, "CSF INTERNO": 5, "CSF AJUDA": 6, "CSF QUALITY": 7}
+
+    # 3. EXTRATOR DINÂMICO DE PESOS (COM PLANO B)
     oficiais = ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]
     pesos_ativos = {ind: {cl: "-" for cl in clusters_totais} for ind in oficiais}
     
@@ -126,20 +146,17 @@ try:
         "CSAT": ["CSAT", "SATISFAÇÃO"],
         "TMA / TMT": ["TMA", "TMT", "TEMPO"],
         "Improcedência Devida": ["IMPROCEDÊNCIA"],
-        "Nota de Monitoria": ["MONITORIA", "NOTA"],
+        "Nota de Monitoria": ["MONITORIA", "NOTA", "QUALIDADE"],
         "Aderência à Escala": ["ADERÊNCIA", "ESCALA"],
         "Evasão de Pausas": ["EVASÃO", "PAUSAS"]
     }
     
     def extrair_pesos(fonte_linhas):
         encontrou = False
-        # Correção do iterador para evitar o erro de 'float object not iterable'
         iterador = [r for _, r in fonte_linhas.iterrows()] if isinstance(fonte_linhas, pd.DataFrame) else fonte_linhas
         
         for row_data in iterador:
-            # Pega todos os valores da linha em formato de string
             row_str = " ".join([str(x).upper() for x in row_data if pd.notna(x)])
-            
             if "PONDERAÇÃO" in row_str or "PESOS" in row_str or "PESO" in row_str:
                 encontrou = True
                 for cl, idx in map_cols.items():
@@ -157,25 +174,29 @@ try:
                 break
         return encontrou
 
-    if not extrair_pesos(linhas_bloco):
-        extrair_pesos(df_raw)
+    extrair_pesos(linhas_bloco)
 
+    # PLANO B (Fallback): Preenche os pesos vazios com a matriz padrão oficial
+    for ind in oficiais:
+        for cl in clusters_totais:
+            if pesos_ativos[ind][cl] == "-" or pesos_ativos[ind][cl] == "0%":
+                pesos_ativos[ind][cl] = pesos_padrao[ind].get(cl, "-")
+
+    # 4. CONSOLIDAÇÃO DE METAS (Fusão total, independente da coluna)
     def pegar_val(r, idx_col):
         if len(r) > idx_col and pd.notna(r.iloc[idx_col]):
             v = str(r.iloc[idx_col]).strip()
             return "-" if v.lower() in ["nan", "", "sem meta"] else v
         return "-"
 
-    # 4. CONSOLIDAÇÃO DE METAS (Fone, Digital, Q1)
     matriz_final = {ind: {cl: {"base": "-", "fone": "-", "dig": "-", "q1": "-"} for cl in clusters_totais} for ind in oficiais}
     current_pAI = None
     
     for row in linhas_bloco:
-        col_b = str(row.iloc[1]).strip() if len(row) > 1 and pd.notna(row.iloc[1]) else ""
-        if col_b == "": col_b = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ""
-        nome_upper = col_b.upper()
+        # Acha o nome da meta fundindo a coluna A e B (Resolve o problema de Maio!)
+        nome_upper = " ".join([str(x).upper().strip() for x in row.iloc[0:2] if pd.notna(x)])
         
-        if "METAS" in nome_upper or "INDICADOR" in nome_upper or "PONDERAÇÃO" in nome_upper or "FAIXAS" in nome_upper:
+        if "METAS" in nome_upper or "PONDERAÇÃO" in nome_upper or "FAIXAS" in nome_upper:
             continue
             
         is_parent = False
@@ -196,7 +217,9 @@ try:
             if "Q1" in nome_upper: matriz_final[current_pAI][cl]["q1"] = val
             elif "FONE" in nome_upper: matriz_final[current_pAI][cl]["fone"] = val
             elif "DIGITAL" in nome_upper or "DIG" in nome_upper: matriz_final[current_pAI][cl]["dig"] = val
-            elif is_parent: matriz_final[current_pAI][cl]["base"] = val
+            elif is_parent:
+                if matriz_final[current_pAI][cl]["base"] == "-": 
+                    matriz_final[current_pAI][cl]["base"] = val
 
     # ==============================================================================
     # QUADRO 1: MATRIZ DE INDICADORES
