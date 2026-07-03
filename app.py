@@ -31,7 +31,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- SIDEBAR: Menu Histórico Consolidado ---
+# --- SIDEBAR ---
 st.sidebar.markdown("## 📊 Filtros Corporativos")
 st.sidebar.markdown("---")
 
@@ -70,7 +70,7 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- ARQUITETURA DE CONTINGÊNCIA DE PESOS HISTÓRICOS ---
+# --- DICIONÁRIOS DE PESOS DE CONTINGÊNCIA (PLANO B HISTÓRICO) ---
 mes_nome = competencia.split(" / ")[0].lower()
 ano_nome = competencia.split(" / ")[1]
 
@@ -85,7 +85,7 @@ if "julho" in mes_nome and "2026" in ano_nome:
         "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
     }
 else:
-    # Configuração Histórica Segura: CSF Quality com 15% na Aderência e 0% na Evasão
+    # Configuração Histórica Premium: Quality com 15% em Aderência e 0% em Evasão
     pesos_padrao = {
         "CSAT": {"RE": "35%", "MONO": "40%", "MULTI": "35%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
         "TMA / TMT": {"RE": "35%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "35%", "CSF AJUDA": "0%", "CSF QUALITY": "35%"},
@@ -95,7 +95,7 @@ else:
         "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"}
     }
 
-# --- PROCESSAMENTO DO ARQUIVO CSV ---
+# --- LEITURA E PROCESSAMENTO INTELIGENTE DO CSV ---
 try:
     try:
         df_raw = pd.read_csv("metas.csv", header=None, sep=';')
@@ -124,14 +124,15 @@ try:
                 
     linhas_bloco = df_raw.iloc[idx_inicio:idx_fim] if idx_inicio != -1 else pd.DataFrame()
 
-    # 2. RADAR OPERACIONAL DE CABEÇALHOS (Scanner de Proximidade)
+    # 2. RADAR OPERACIONAL DE CABEÇALHOS (Scanner Multilinha com mapeamento CAR -> RE)
     map_cols = {}
     for idx in range(max(0, idx_inicio - 1), min(len(df_raw), idx_fim)):
         row = df_raw.iloc[idx]
         row_str = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
-        if "RE" in row_str or "CSF" in row_str or "MONO" in row_str or "INTERNO" in row_str:
+        if any(c in row_str for c in ["RE", "CAR", "C.A.R.", "CSF", "MONO", "INTERNO"]):
             for i, val in enumerate(row_str):
-                if val in ["RE", "R.E", "R.E."]: map_cols["RE"] = i
+                # Regra de Equivalência Histórica: Se for CAR ou RE, joga no cluster RE do painel
+                if val in ["RE", "R.E", "R.E.", "CAR", "C.A.R.", "C.A.R"]: map_cols["RE"] = i
                 elif "MONO" in val or "CRC MONO" in val: map_cols["MONO"] = i
                 elif "MULTI" in val or "CRC MULTI" in val: map_cols["MULTI"] = i
                 elif "INTERNO" in val or "CSF INTERNO" in val: map_cols["CSF INTERNO"] = i
@@ -139,7 +140,7 @@ try:
                 elif "QUALITY" in val or "CSF QUALITY" in val: map_cols["CSF QUALITY"] = i
                 elif "CSF" in val: map_cols["CSF_GENERICO"] = i
             
-            # Tratamento Estrutural Pré-Março: Clona a coluna CSF unificada para Interno e Quality
+            # Tratamento pré-março de 2026: Clona a coluna unificada CSF para Interno e Quality
             if "CSF_GENERICO" in map_cols:
                 if "CSF INTERNO" not in map_cols: map_cols["CSF INTERNO"] = map_cols["CSF_GENERICO"]
                 if "CSF QUALITY" not in map_cols: map_cols["CSF QUALITY"] = map_cols["CSF_GENERICO"]
@@ -181,7 +182,6 @@ try:
                                 break
             break
 
-    # Garante o acoplamento do Plano B
     if not achou_pesos_no_arquivo:
         pesos_ativos = pesos_padrao
 
@@ -190,7 +190,7 @@ try:
             if pesos_ativos[ind][cl] == "-" or pesos_ativos[ind][cl] == "0%" or pesos_ativos[ind][cl] == "":
                 pesos_ativos[ind][cl] = pesos_padrao[ind].get(cl, "-")
 
-    # 4. CONSOLIDAÇÃO DE METAS POR COLUNAS TRAVADAS
+    # 4. CONSOLIDAÇÃO DE METAS (Fusão de linhas de forma super flexível)
     matriz_final = {ind: {cl: {"base": "-", "fone": "-", "dig": "-", "q1": "-"} for cl in clusters_totais} for ind in oficiais}
     current_pAI = None
     
@@ -198,7 +198,7 @@ try:
         idx_col = map_cols.get(cl, -1)
         if idx_col != -1 and len(r) > idx_col and pd.notna(r.iloc[idx_col]):
             v = str(r.iloc[idx_col]).strip()
-            return "-" if v.lower() in ["nan", "", "sem meta"] else v
+            return "-" if v.lower() in ["nan", "", "sem meta", "inativo"] else v
         return "-"
 
     for idx, row in linhas_bloco.iterrows():
@@ -219,6 +219,10 @@ try:
             continue
             
         for cl in clusters_totais:
+            # Trava para desativar o CSF Ajuda dinamicamente antes de Junho de 2026
+            if cl == "CSF AJUDA" and not ("Julho" in competencia or "Junho / 2026" in competencia):
+                continue
+                
             val = pegar_val(row, cl)
             if val == "-": continue
             
@@ -234,7 +238,7 @@ try:
     # ==============================================================================
     st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
     
-    html_tabela = '<table class="table-executiva"><thead><tr><th rowspan="2">Métrica / Indicador</th>'
+    html_tabela = '<table class="table-executiva"><thead><tr><th rowspan="2">Métrica / Indicator</th>'
     for cluster in clusters_filtrados:
         html_tabela += f'<th colspan="2">{cluster}</th>'
     html_tabela += '</tr><tr>'
