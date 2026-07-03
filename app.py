@@ -70,7 +70,7 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- DETERMINAÇÃO DAS ERAS DA OPERAÇÃO ---
+# --- ARQUITETURA DE MATRIZ DE PESOS EVOLUTIVA ---
 mes_nome = competencia.split(" / ")[0].lower()
 ano_nome = competencia.split(" / ")[1]
 
@@ -107,7 +107,6 @@ try:
     # 1. LOCALIZADOR DE BLOCOS FLEXÍVEL
     idx_inicio = -1
     idx_fim = len(df_raw)
-    
     target_token = mes_nome.replace("ç", "c").strip()
     
     for idx, row in df_raw.iterrows():
@@ -163,9 +162,7 @@ try:
 
     for idx, row in linhas_bloco.iterrows():
         nome_linha = " ".join([str(x).upper().strip() for x in row.iloc[:3] if pd.notna(x)])
-        
-        if any(p in nome_linha for p in ["PONDERAÇÃO", "PONDERACAO", "FAIXAS", "PESOS"]):
-            continue
+        if any(p in nome_linha for p in ["PONDERAÇÃO", "PONDERACAO", "FAIXAS", "PESOS"]): continue
             
         is_parent = False
         if ("CSAT" in nome_linha or "SATISFAÇÃO" in nome_linha or "SATISFACAO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "CSAT"; is_parent = True
@@ -175,8 +172,7 @@ try:
         elif ("ADERÊNCIA" in nome_linha or "ADERENCIA" in nome_linha or "ESCALA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Aderência à Escala"; is_parent = True
         elif ("EVASÃO" in nome_linha or "EVASAO" in nome_linha or "PAUSAS" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Evasão de Pausas"; is_parent = True
         
-        if not current_pAI:
-            continue
+        if not current_pAI: continue
             
         for cl in clusters_totais:
             if cl == "CSF AJUDA" and not has_csf_ajuda: continue
@@ -213,48 +209,26 @@ try:
         
         for cluster in clusters_filtrados:
             dados_celula = matriz_final[indicador][cluster]
-            
-            meta_html = ""
-            if dados_celula["fone"] != "-" or dados_celula["dig"] != "-":
-                f_str = f"Fone: {dados_celula['fone']}" if dados_celula["fone"] != "-" else ""
-                d_str = f"Dig: {dados_celula['dig']}" if dados_celula["dig"] != "-" else ""
-                sep = " / " if f_str and d_str else ""
-                meta_html = f"{f_str}{sep}{d_str}"
-            else:
-                meta_html = dados_celula["base"]
-                
+            meta_html = f"Fone: {dados_celula['fone']} / Dig: {dados_celula['dig']}" if dados_celula["fone"] != "-" or dados_celula["dig"] != "-" else dados_celula["base"]
             if dados_celula["q1"] != "-":
-                if meta_html == "-" or meta_html == "": meta_html = f"<small class='meta-muted-gray'>Q1: {dados_celula['q1']}</small>"
-                else: meta_html += f"<br><small class='meta-muted-gray'>Q1: {dados_celula['q1']}</small>"
+                meta_html = f"<small class='meta-muted-gray'>Q1: {dados_celula['q1']}</small>" if meta_html == "-" else f"{meta_html}<br><small class='meta-muted-gray'>Q1: {dados_celula['q1']}</small>"
 
             if meta_html == "" or "*** NÃO SEGUIRÁ" in meta_html.upper() or "INATIVO" in meta_html.upper() or "NÃO SEGUIRÁ" in meta_html.upper():
                 meta_html = "-"
 
-            peso_val = "-"
-            if meta_html != "-":
-                peso_val = pesos_padrao[indicador].get(cluster, "-")
-            
+            peso_val = pesos_padrao[indicador].get(cluster, "-") if meta_html != "-" else "-"
             if peso_val == "0%": peso_val = "-"
             
             try: pesos_sincronizados_grafico[indicador][cluster] = int(peso_val.replace("%", "")) if peso_val != "-" else 0
             except: pesos_sincronizados_grafico[indicador][cluster] = 0
 
-            if meta_html == "-":
-                celula_html = f'<td class="meta-muted-gray">{meta_html}</td>'
-            elif "TMA" in indicador:
-                celula_html = f'<td class="meta-tma-gray">{meta_html}</td>'
-            else:
-                celula_html = f'<td>{meta_html}</td>'
-                
-            html_tabela += celula_html + f'<td>{peso_val}</td>'
+            celula_style = ' class="meta-muted-gray"' if meta_html == "-" else (' class="meta-tma-gray"' if "TMA" in indicador else '')
+            html_tabela += f'<td{celula_style}>{meta_html}</td><td>{peso_val}</td>'
         html_tabela += '</tr>'
-        
     html_tabela += '</tbody></table>'
     
-    if idx_inicio == -1:
-        st.warning(f"Sincronizando a estrutura da planilha metas.csv para {competencia}...")
-    else:
-        st.html(html_tabela)
+    if idx_inicio == -1: st.warning(f"Sincronizando a estrutura da planilha metas.csv para {competencia}...")
+    else: st.html(html_tabela)
 
     # ==============================================================================
     # RESUMO E GRÁFICOS
@@ -269,8 +243,7 @@ try:
     if idx_inicio != -1 and len(linhas_bloco) > 0:
         st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
         html_resumo = '<table class="table-executiva"><thead><tr><th>Dimensão Estratégica / Pilar</th>'
-        for cluster in clusters_filtrados:
-            html_resumo += f'<th>{cluster}</th>'
+        for cluster in clusters_filtrados: html_resumo += f'<th>{cluster}</th>'
         html_resumo += '</tr></thead><tbody>'
 
         dados_resumo = [
@@ -280,16 +253,57 @@ try:
         ]
         for pilar, valores in dados_resumo:
             html_resumo += f'<tr><td style="text-align: left !important; font-weight: bold;">{pilar}</td>'
-            for val in valores:
-                if val == "-": html_resumo += f'<td class="meta-muted-gray">{val}</td>'
-                else: html_resumo += f'<td>{val}</td>'
+            for val in valores: html_resumo += f'<td class="meta-muted-gray">{val}</td>' if val == "-" else f'<td>{val}</td>'
             html_resumo += '</tr>'
         html_resumo += '</tbody></table>'
         st.html(html_resumo)
+
+        # --- SEÇÃO DE EXPORTAÇÃO PDF CORPORATIVO ---
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 📥 Exportar Dados")
+        
+        # Gerador nativo e limpo de HTML para visualização impressa
+        html_para_pdf = f"""
+        <html>
+        <head>
+            <style>
+                body {{ font-family: sans-serif; color: #0f172a; padding: 20px; }}
+                h2 {{ color: #1e293b; font-size: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; }}
+                .meta {{ font-size: 12px; color: #64748b; margin-bottom: 20px; }}
+                {st.values if False else ''}
+                .table-pdf {{ width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 25px; }}
+                .table-pdf th {{ background-color: #f1f5f9; color: #1e293b; padding: 8px; border: 1px solid #cbd5e1; text-align: center; }}
+                .table-pdf td {{ padding: 8px; border: 1px solid #cbd5e1; text-align: center; }}
+            </style>
+        </head>
+        <body>
+            <h2>Painel Executivo de Metas & Pesos CEX</h2>
+            <div class="meta">Competência Selecionada: {competencia} | Segmentação Visual: {filtro_macro}</div>
+            
+            <h2>📋 Matriz Integrada de Metas e Pesos</h2>
+            {html_tabela.replace('class="table-executiva"', 'class="table-pdf"')}
+            
+            <h2>⚖️ Resumo por Dimensão Estratégica</h2>
+            {html_resumo.replace('class="table-executiva"', 'class="table-pdf"')}
+        </body>
+        </html>
+        """
+        
+        # Oferece a exportação em formato HTML que abre perfeitamente em modo de impressão (PDF)
+        st.sidebar.download_button(
+            label="📄 Gerar Versão para Slack / PDF",
+            data=html_para_pdf,
+            file_name=f"Metas_CEX_{mes_nome}_{ano_nome}.html",
+            mime="text/html",
+            help="Clique para baixar. Abra o arquivo no navegador e aperte Ctrl+P (Salvar como PDF) para enviar no Slack!"
+        )
+
+        st.sidebar.caption("💡 *Dica:* Ao abrir o arquivo baixado, salve como PDF para anexar direto nos canais do Slack.")
         st.divider()
 
+        # Renderização do gráfico Plotly
         st.subheader("📊 Campo Comparativo: Visão Gráfica da Arquitetura de Pesos")
-        valores_csat = [valores_csat[c] for c in range(len(clusters_filtrados))] if 'valores_csat' in locals() and isinstance(valores_csat, dict) else [pesos_sincronizados_grafico["CSAT"][c] for c in clusters_filtrados]
+        valores_csat = [pesos_sincronizados_grafico["CSAT"][c] for c in clusters_filtrados]
         valores_eficiencia = [pesos_sincronizados_grafico["TMA / TMT"][c] + pesos_sincronizados_grafico["Improcedência Devida"][c] for c in clusters_filtrados]
         valores_disciplina = [pesos_sincronizados_grafico["Nota de Monitoria"][c] + pesos_sincronizados_grafico["Aderência à Escala"][c] + pesos_sincronizados_grafico["Evasão de Pausas"][c] for c in clusters_filtrados]
 
