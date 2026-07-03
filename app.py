@@ -85,7 +85,7 @@ if "julho" in mes_nome and "2026" in ano_nome:
         "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
     }
 else:
-    # Configuração Histórica Premium: Quality com 15% em Aderência e 0% em Evasão
+    # Histórico: Quality 15% na Aderência / 0% Evasão
     pesos_padrao = {
         "CSAT": {"RE": "35%", "MONO": "40%", "MULTI": "35%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
         "TMA / TMT": {"RE": "35%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "35%", "CSF AJUDA": "0%", "CSF QUALITY": "35%"},
@@ -103,7 +103,7 @@ try:
     except:
         df_raw = pd.read_csv("metas.csv", header=None, sep=',')
 
-    # 1. LOCALIZADOR DINÂMICO DE BLOCOS (Isolamento por Mês e Ano)
+    # 1. LOCALIZADOR DINÂMICO DE BLOCOS
     idx_inicio = -1
     idx_fim = len(df_raw)
     
@@ -124,14 +124,13 @@ try:
                 
     linhas_bloco = df_raw.iloc[idx_inicio:idx_fim] if idx_inicio != -1 else pd.DataFrame()
 
-    # 2. RADAR OPERACIONAL DE CABEÇALHOS (Scanner Multilinha com mapeamento CAR -> RE)
+    # 2. RADAR OPERACIONAL DE CABEÇALHOS (Equivalência CAR -> RE)
     map_cols = {}
     for idx in range(max(0, idx_inicio - 1), min(len(df_raw), idx_fim)):
         row = df_raw.iloc[idx]
         row_str = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
         if any(c in row_str for c in ["RE", "CAR", "C.A.R.", "CSF", "MONO", "INTERNO"]):
             for i, val in enumerate(row_str):
-                # Regra de Equivalência Histórica: Se for CAR ou RE, joga no cluster RE do painel
                 if val in ["RE", "R.E", "R.E.", "CAR", "C.A.R.", "C.A.R"]: map_cols["RE"] = i
                 elif "MONO" in val or "CRC MONO" in val: map_cols["MONO"] = i
                 elif "MULTI" in val or "CRC MULTI" in val: map_cols["MULTI"] = i
@@ -140,7 +139,6 @@ try:
                 elif "QUALITY" in val or "CSF QUALITY" in val: map_cols["CSF QUALITY"] = i
                 elif "CSF" in val: map_cols["CSF_GENERICO"] = i
             
-            # Tratamento pré-março de 2026: Clona a coluna unificada CSF para Interno e Quality
             if "CSF_GENERICO" in map_cols:
                 if "CSF INTERNO" not in map_cols: map_cols["CSF INTERNO"] = map_cols["CSF_GENERICO"]
                 if "CSF QUALITY" not in map_cols: map_cols["CSF QUALITY"] = map_cols["CSF_GENERICO"]
@@ -149,7 +147,7 @@ try:
     if not map_cols:
         map_cols = {"RE": 2, "MONO": 3, "MULTI": 4, "CSF INTERNO": 5, "CSF AJUDA": 6, "CSF QUALITY": 7}
 
-    # 3. EXTRAÇÃO DE PESOS DA COMPETÊNCIA
+    # 3. EXTRAÇÃO DE PESOS E TRAVA HISTÓRICA
     oficiais = ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]
     pesos_ativos = {ind: {cl: "-" for cl in clusters_totais} for ind in oficiais}
     achou_pesos_no_arquivo = False
@@ -182,15 +180,18 @@ try:
                                 break
             break
 
-    if not achou_pesos_no_arquivo:
-        pesos_ativos = pesos_padrao
-
+    # Anula pesos do CSF AJUDA antes de Junho/2026 e acopla o Plano B
     for ind in oficiais:
         for cl in clusters_totais:
-            if pesos_ativos[ind][cl] == "-" or pesos_ativos[ind][cl] == "0%" or pesos_ativos[ind][cl] == "":
+            if cl == "CSF AJUDA":
+                if ano_nome == "2025" or (ano_nome == "2026" and mes_nome in ["janeiro", "fevereiro", "março", "marco", "abril", "maio"]):
+                    pesos_ativos[ind][cl] = "-"
+                    continue
+                    
+            if not achou_pesos_no_arquivo or pesos_ativos[ind][cl] == "-" or pesos_ativos[ind][cl] == "0%" or pesos_ativos[ind][cl] == "":
                 pesos_ativos[ind][cl] = pesos_padrao[ind].get(cl, "-")
 
-    # 4. CONSOLIDAÇÃO DE METAS (Fusão de linhas de forma super flexível)
+    # 4. EXTRATOR MESTRE DE METAS (Com Efeito Magnético para linhas órfãs)
     matriz_final = {ind: {cl: {"base": "-", "fone": "-", "dig": "-", "q1": "-"} for cl in clusters_totais} for ind in oficiais}
     current_pAI = None
     
@@ -198,7 +199,7 @@ try:
         idx_col = map_cols.get(cl, -1)
         if idx_col != -1 and len(r) > idx_col and pd.notna(r.iloc[idx_col]):
             v = str(r.iloc[idx_col]).strip()
-            return "-" if v.lower() in ["nan", "", "sem meta", "inativo"] else v
+            return "-" if v.lower() in ["nan", "", "sem meta", "inativo", "-", "n/a"] else v
         return "-"
 
     for idx, row in linhas_bloco.iterrows():
@@ -207,29 +208,33 @@ try:
         if "METAS" in nome_linha or "PONDERAÇÃO" in nome_linha or "FAIXAS" in nome_linha or "INDICADOR" in nome_linha:
             continue
             
-        is_parent = False
-        if ("CSAT" in nome_linha or "SATISFAÇÃO" in nome_linha or "SATISFACAO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "CSAT"; is_parent = True
-        elif ("TMA" in nome_linha or "TMT" in nome_linha or "TEMPO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "TMA / TMT"; is_parent = True
-        elif ("IMPROCEDÊNCIA" in nome_linha or "IMPROCEDENCIA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Improcedência Devida"; is_parent = True
-        elif ("MONITORIA" in nome_linha or "QUALIDADE" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Nota de Monitoria"; is_parent = True
-        elif ("ADERÊNCIA" in nome_linha or "ADERENCIA" in nome_linha or "ESCALA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Aderência à Escala"; is_parent = True
-        elif ("EVASÃO" in nome_linha or "EVASAO" in nome_linha or "PAUSAS" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Evasão de Pausas"; is_parent = True
+        if ("CSAT" in nome_linha or "SATISFAÇÃO" in nome_linha or "SATISFACAO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "CSAT"
+        elif ("TMA" in nome_linha or "TMT" in nome_linha or "TEMPO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "TMA / TMT"
+        elif ("IMPROCEDÊNCIA" in nome_linha or "IMPROCEDENCIA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Improcedência Devida"
+        elif ("MONITORIA" in nome_linha or "QUALIDADE" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Nota de Monitoria"
+        elif ("ADERÊNCIA" in nome_linha or "ADERENCIA" in nome_linha or "ESCALA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Aderência à Escala"
+        elif ("EVASÃO" in nome_linha or "EVASAO" in nome_linha or "PAUSAS" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Evasão de Pausas"
         
         if not current_pAI:
             continue
             
         for cl in clusters_totais:
-            # Trava para desativar o CSF Ajuda dinamicamente antes de Junho de 2026
-            if cl == "CSF AJUDA" and not ("Julho" in competencia or "Junho / 2026" in competencia):
-                continue
-                
+            # Trava Absoluta: CSF Ajuda não recebe meta antes de Junho/2026
+            if cl == "CSF AJUDA":
+                if ano_nome == "2025" or (ano_nome == "2026" and mes_nome in ["janeiro", "fevereiro", "março", "marco", "abril", "maio"]):
+                    continue
+
             val = pegar_val(row, cl)
             if val == "-": continue
             
-            if "Q1" in nome_linha: matriz_final[current_pAI][cl]["q1"] = val
-            elif "FONE" in nome_linha: matriz_final[current_pAI][cl]["fone"] = val
-            elif "DIGITAL" in nome_linha or "DIG" in nome_linha: matriz_final[current_pAI][cl]["dig"] = val
-            elif is_parent:
+            if "Q1" in nome_linha: 
+                matriz_final[current_pAI][cl]["q1"] = val
+            elif "FONE" in nome_linha: 
+                matriz_final[current_pAI][cl]["fone"] = val
+            elif "DIGITAL" in nome_linha or "DIG" in nome_linha: 
+                matriz_final[current_pAI][cl]["dig"] = val
+            else:
+                # O Segredo Magnético: Captura a meta órfã da linha de baixo que ficou sem nome por causa de mesclagem
                 if matriz_final[current_pAI][cl]["base"] == "-": 
                     matriz_final[current_pAI][cl]["base"] = val
 
@@ -238,7 +243,7 @@ try:
     # ==============================================================================
     st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
     
-    html_tabela = '<table class="table-executiva"><thead><tr><th rowspan="2">Métrica / Indicator</th>'
+    html_tabela = '<table class="table-executiva"><thead><tr><th rowspan="2">Métrica / Indicador</th>'
     for cluster in clusters_filtrados:
         html_tabela += f'<th colspan="2">{cluster}</th>'
     html_tabela += '</tr><tr>'
