@@ -70,111 +70,97 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- DICIONÁRIO PADRÃO DE CONTINGÊNCIA (Só entra em ação se a linha Ponderação não existir no arquivo) ---
-pesos_padrao = {
-    "CSAT": {"RE": "35%", "MONO": "35%", "MULTI": "30%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
-    "TMA / TMT": {"RE": "30%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "30%", "CSF AJUDA": "0%", "CSF QUALITY": "30%"},
-    "Improcedência Devida": {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "30%", "CSF QUALITY": "10%"},
-    "Nota de Monitoria": {"RE": "25%", "MONO": "25%", "MULTI": "15%", "CSF INTERNO": "45%", "CSF AJUDA": "50%", "CSF QUALITY": "45%"},
-    "Aderência à Escala": {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "15%"}, # Oculta automático se não houver meta
-    "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}    # Oculta automático se não houver meta
-}
+# --- ARQUITETURA DE MATRIZ DE PESOS EVOLUTIVA ---
+mes_nome = competencia.split(" / ")[0].lower()
+ano_nome = competencia.split(" / ")[1]
 
-# --- LEITURA E PROCESSAMENTO ULTRA-BLINDADO DO CSV ---
+# Identificação Dinâmica da Era da Operação
+is_era_unificada_csf = (ano_nome == "2025") or (ano_nome == "2026" and mes_nome in ["janeiro", "fevereiro", "março", "marco"])
+has_csf_ajuda = (ano_nome == "2026" and mes_nome in ["junho", "julho"])
+
+# Atribuição Cirúrgica de Pesos Baseada na Linha do Tempo Real do Negócio
+pesos_ativos = {ind: {cl: "-" for cl in clusters_totais} for ind in ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]}
+
+if "julho" in mes_nome and "2026" in ano_nome:
+    pesos_ativos["CSAT"] = {"RE": "35%", "MONO": "35%", "MULTI": "30%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"}
+    pesos_ativos["TMA / TMT"] = {"RE": "30%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "30%", "CSF AJUDA": "0%", "CSF QUALITY": "30%"}
+    pesos_ativos["Improcedência Devida"] = {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "30%", "CSF QUALITY": "10%"}
+    pesos_ativos["Nota de Monitoria"] = {"RE": "25%", "MONO": "25%", "MULTI": "15%", "CSF INTERNO": "45%", "CSF AJUDA": "50%", "CSF QUALITY": "45%"}
+    pesos_ativos["Aderência à Escala"] = {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "0%"}
+    pesos_ativos["Evasão de Pausas"] = {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
+else:
+    # Parâmetros Históricos Oficiais (Consolidados para 2025 até Junho 2026)
+    pesos_ativos["CSAT"] = {"RE": "35%", "MONO": "40%", "MULTI": "35%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"}
+    pesos_ativos["TMA / TMT"] = {"RE": "35%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "35%", "CSF AJUDA": "0%", "CSF QUALITY": "35%"}
+    pesos_ativos["Improcedência Devida"] = {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "10%"}
+    pesos_ativos["Nota de Monitoria"] = {"RE": "20%", "MONO": "20%", "MULTI": "10%", "CSF INTERNO": "40%", "CSF AJUDA": "0%", "CSF QUALITY": "40%"}
+    pesos_ativos["Aderência à Escala"] = {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
+    pesos_ativos["Evasão de Pausas"] = {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"}
+
+    # Transição Específica da Era de Junho (Abertura do CSF Ajuda)
+    if "junho" in mes_nome:
+        pesos_ativos["Improcedência Devida"]["CSF AJUDA"] = "30%"
+        pesos_ativos["Nota de Monitoria"]["CSF AJUDA"] = "50%"
+        pesos_ativos["Aderência à Escala"]["CSF AJUDA"] = "20%"
+        
+    # Transição Específica de Março para trás (Qualidade se unia em Aderência, Evasão nasceu em Abril/26)
+    if ano_nome == "2026" and mes_nome in ["abril", "maio", "junho"]:
+        pesos_ativos["Aderência à Escala"]["CSF QUALITY"] = "0%"
+        pesos_ativos["Evasão de Pausas"]["CSF QUALITY"] = "15%"
+
+# --- PROCESSAMENTO EXECUTIVO DO CSV ---
 try:
-    try:
-        df_raw = pd.read_csv("metas.csv", header=None, sep=';')
-        if df_raw.shape[1] <= 1: raise ValueError
-    except:
-        df_raw = pd.read_csv("metas.csv", header=None, sep=',')
+    # Leitura inteligente com detecção de encoding e separadores
+    df_raw = pd.read_csv("metas.csv", header=None, sep=None, engine='python')
 
-    mes_nome = competencia.split(" / ")[0].lower()
-    ano_nome = competencia.split(" / ")[1]
-
-    # 1. LOCALIZADOR DINÂMICO DE BLOCOS
+    # 1. LOCALIZADOR DE BLOCOS POR CORRESPONDÊNCIA AMPLA
     idx_inicio = -1
     idx_fim = len(df_raw)
     
     for idx, row in df_raw.iterrows():
-        txt_linha = " ".join([str(x).strip().lower() for x in row.iloc[:5] if pd.notna(x)])
-        if mes_nome in txt_linha and ano_nome in txt_linha:
+        txt_linha = " ".join([str(x).strip().lower() for x in row.iloc[:4] if pd.notna(x)])
+        # Garante o match exato de termos simplificados do Sheets (ex: "maio/2026" ou "julho 2026")
+        target_token = mes_nome.replace("ç", "c")
+        clean_linha = txt_linha.replace("ç", "c")
+        if target_token in clean_linha and ano_nome in clean_linha:
             idx_inicio = idx
             break
             
     if idx_inicio != -1:
         for idx in range(idx_inicio + 1, len(df_raw)):
-            txt_linha = " ".join([str(x).strip().lower() for x in df_raw.iloc[idx, :5] if pd.notna(x)])
-            meses_stop = ["janeiro", "fevereiro", "março", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
-            if any(m in txt_linha for m in meses_stop) and (ano_nome in txt_linha or "2025" in txt_linha or "2026" in txt_linha or "↓" in txt_linha or "histórico" in txt_linha):
-                if idx > idx_inicio + 2:
-                    idx_fim = idx
-                    break
+            txt_linha = " ".join([str(x).strip().lower() for x in df_raw.iloc[idx, :4] if pd.notna(x)])
+            meses_stop = ["janeiro", "fevereiro", "março", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro", "histórico", "↓"]
+            if any(m in txt_linha for m in meses_stop) and idx > idx_inicio + 3:
+                idx_fim = idx
+                break
                 
     linhas_bloco = df_raw.iloc[idx_inicio:idx_fim] if idx_inicio != -1 else pd.DataFrame()
 
-    # 2. RADAR OPERACIONAL DE CABEÇALHOS (Reconhecimento de Evolução da Operação)
+    # 2. RADAR DE MAPEAMENTO DE COLUNAS HISTÓRICAS
     map_cols = {}
-    for idx in range(max(0, idx_inicio - 2), min(len(df_raw), idx_fim)):
-        row = df_raw.iloc[idx]
+    for idx, row in linhas_bloco.iterrows():
         row_str = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
-        txt_full = " ".join(row_str)
-        
-        # Para a busca ao esbarrar nos dados das metas
-        if any(c in txt_full for c in ["CSAT", "SATISFAÇÃO", "SATISFACAO", "TMA", "IMPROCEDÊNCIA"]):
+        if "METAS" in " ".join(row_str) or "RE" in row_str or "CAR" in row_str:
+            for i, val in enumerate(row_str):
+                if val in ["RE", "R.E", "CAR", "C.A.R."]: map_cols["RE"] = i
+                elif "MONO" in val: map_cols["MONO"] = i
+                elif "MULTI" in val: map_cols["MULTI"] = i
+                elif "INTERNO" in val or "CSF INTERNO" in val: map_cols["CSF INTERNO"] = i
+                elif "AJUDA" in val or "CSF AJUDA" in val: map_cols["CSF AJUDA"] = i
+                elif "QUALITY" in val or "CSF QUALITY" in val: map_cols["CSF QUALITY"] = i
+                elif val == "CSF" or "CSF E QUALITY" in val: map_cols["CSF_GENERICO"] = i
             break
-            
-        for i, val in enumerate(row_str):
-            if not val: continue
-            if val in ["RE", "R.E", "R.E.", "CAR", "C.A.R.", "C.A.R"]: map_cols["RE"] = i
-            elif "MONO" in val or "CRC MONO" in val: map_cols["MONO"] = i
-            elif "MULTI" in val or "CRC MULTI" in val: map_cols["MULTI"] = i
-            elif val in ["INTERNO", "CSF INTERNO"]: map_cols["CSF INTERNO"] = i
-            elif val in ["AJUDA", "CSF AJUDA"]: map_cols["CSF AJUDA"] = i
-            elif val in ["QUALITY", "CSF QUALITY"]: map_cols["CSF QUALITY"] = i
-            elif val == "CSF" or "QUALITY (QUANDO" in val: map_cols["CSF_GENERICO"] = i
-            
-    # Mapeia operações antigas integradas (Até Março/2026)
-    if "CSF_GENERICO" in map_cols:
-        if "CSF INTERNO" not in map_cols: map_cols["CSF INTERNO"] = map_cols["CSF_GENERICO"]
-        if "CSF QUALITY" not in map_cols: map_cols["CSF QUALITY"] = map_cols["CSF_GENERICO"]
-        del map_cols["CSF_GENERICO"] # Limpa chave genérica
+
+    # amarração para a Era Unificada (Até Março/2026)
+    if is_era_unificada_csf and "CSF_GENERICO" in map_cols:
+        map_cols["CSF INTERNO"] = map_cols["CSF_GENERICO"]
+        map_cols["CSF QUALITY"] = map_cols["CSF_GENERICO"]
 
     if not map_cols:
-        map_cols = {"RE": 2, "MONO": 3, "MULTI": 4, "CSF INTERNO": 5, "CSF AJUDA": 6, "CSF QUALITY": 7}
+        map_cols = {"RE": 2, "CSF INTERNO": 3, "CSF AJUDA": 4, "CSF QUALITY": 5, "MONO": 6, "MULTI": 7}
 
-    # 3. EXTRAÇÃO DINÂMICA DE PESOS
+    # 3. EXTRATOR DE METAS MULTILINHAS (FONE, DIGITAL, BASE, Q1)
     oficiais = ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]
-    pesos_ativos = {ind: {cl: "-" for cl in clusters_totais} for ind in oficiais}
-    achou_pesos_no_arquivo = False
-    
-    map_terms = {
-        "CSAT": ["CSAT", "SATISFAÇÃO", "SATISFACAO"],
-        "TMA / TMT": ["TMA", "TMT", "TEMPO"],
-        "Improcedência Devida": ["IMPROCEDÊNCIA", "IMPROCEDENCIA"],
-        "Nota de Monitoria": ["MONITORIA", "NOTA DE"],
-        "Aderência à Escala": ["ADERÊNCIA", "ADERENCIA", "ESCALA"],
-        "Evasão de Pausas": ["EVASÃO", "EVASAO", "PAUSAS"]
-    }
-
-    for idx, row in linhas_bloco.iterrows():
-        row_str = " ".join([str(x).upper() for x in row if pd.notna(x)])
-        if "PONDERAÇÃO" in row_str or "PESOS" in row_str or "PESO" in row_str:
-            achou_pesos_no_arquivo = True
-            for cl, i_col in map_cols.items():
-                if len(row) > i_col and pd.notna(row.iloc[i_col]):
-                    cell_text = str(row.iloc[i_col]).upper()
-                    for ind, terms in map_terms.items():
-                        for term in terms:
-                            pattern = re.escape(term) + r'.{0,35}?(\d+(?:[.,]\d+)?)\s*%'
-                            match = re.search(pattern, cell_text)
-                            if match:
-                                v = match.group(1).replace(",", ".")
-                                if v.endswith(".0"): v = v[:-2]
-                                pesos_ativos[ind][cl] = v + "%"
-                                break
-            break
-
-    # 4. EXTRATOR MESTRE DE METAS (Com imã para células órfãs)
     matriz_final = {ind: {cl: {"base": "-", "fone": "-", "dig": "-", "q1": "-"} for cl in clusters_totais} for ind in oficiais}
     current_pAI = None
     
@@ -186,13 +172,13 @@ try:
         return "-"
 
     for idx, row in linhas_bloco.iterrows():
-        nome_linha = " ".join([str(x).upper().strip() for x in row.iloc[:5] if pd.notna(x)])
+        nome_linha = " ".join([str(x).upper().strip() for x in row.iloc[:3] if pd.notna(x)])
         
         if any(p in nome_linha for p in ["PONDERAÇÃO", "PONDERACAO", "FAIXAS", "PESOS"]):
             continue
             
         is_parent = False
-        if ("CSAT" in nome_linha or "SATISFAÇÃO" in nome_linha or "SATISFACAO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "CSAT"; is_parent = True
+        if ("CSAT" in nome_linha or "SATISFAÇÃO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "CSAT"; is_parent = True
         elif ("TMA" in nome_linha or "TMT" in nome_linha or "TEMPO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "TMA / TMT"; is_parent = True
         elif ("IMPROCEDÊNCIA" in nome_linha or "IMPROCEDENCIA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Improcedência Devida"; is_parent = True
         elif ("MONITORIA" in nome_linha or "NOTA DE" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Nota de Monitoria"; is_parent = True
@@ -203,18 +189,20 @@ try:
             continue
             
         for cl in clusters_totais:
+            # Trava Absoluta: Oculta o CSF Ajuda se ele não existia no mês avaliado
+            if cl == "CSF AJUDA" and not has_csf_ajuda: continue
+            
             val = pegar_val(row, cl)
             if val == "-": continue
             
             if "Q1" in nome_linha: matriz_final[current_pAI][cl]["q1"] = val
             elif "FONE" in nome_linha: matriz_final[current_pAI][cl]["fone"] = val
             elif "DIGITAL" in nome_linha or "DIG" in nome_linha: matriz_final[current_pAI][cl]["dig"] = val
-            else:
-                if matriz_final[current_pAI][cl]["base"] == "-": 
-                    matriz_final[current_pAI][cl]["base"] = val
+            elif is_parent:
+                if matriz_final[current_pAI][cl]["base"] == "-": matriz_final[current_pAI][cl]["base"] = val
 
     # ==============================================================================
-    # QUADRO 1 E REGRA DE OURO (Se não tem Meta, não tem Peso)
+    # QUADRO 1: CONSTRUÇÃO VISUAL DA TABELA INTEGRADA
     # ==============================================================================
     st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
     
@@ -227,9 +215,7 @@ try:
     html_tabela += '</tr></thead><tbody>'
 
     icones = {"CSAT": "💻 ", "TMA / TMT": "⏱️ ", "Improcedência Devida": "🚫 ", "Nota de Monitoria": "🎧 ", "Aderência à Escala": "📅 ", "Evasão de Pausas": "🛑 "}
-    
-    # Dicionário fechado para calcular o gráfico baseado apenas nos pesos válidos da tela
-    pesos_finais_grafico = {ind: {cl: "0%" for cl in clusters_totais} for ind in oficiais}
+    pesos_sincronizados_grafico = {ind: {cl: 0 for cl in clusters_totais} for ind in oficiais}
 
     for indicador in oficiais:
         html_tabela += f'<tr><td style="text-align: left !important; padding-left: 15px;"><b>{icones[indicador]}{indicador}</b></td>'
@@ -237,7 +223,7 @@ try:
         for cluster in clusters_filtrados:
             dados_celula = matriz_final[indicador][cluster]
             
-            # Formatação HTML da Meta
+            # Montagem estruturada do texto da Meta
             meta_html = ""
             if dados_celula["fone"] != "-" or dados_celula["dig"] != "-":
                 f_str = f"Fone: {dados_celula['fone']}" if dados_celula["fone"] != "-" else ""
@@ -248,61 +234,49 @@ try:
                 meta_html = dados_celula["base"]
                 
             if dados_celula["q1"] != "-":
-                if meta_html == "-" or meta_html == "": 
-                    meta_html = f"<small class='meta-muted-gray'>Q1: {dados_celula['q1']}</small>"
-                else:
-                    meta_html += f"<br><small class='meta-muted-gray'>Q1: {dados_celula['q1']}</small>"
+                if meta_html == "-" or meta_html == "": meta_html = f"<small class='meta-muted-gray'>Q1: {dados_celula['q1']}</small>"
+                else: meta_html += f"<br><small class='meta-muted-gray'>Q1: {dados_celula['q1']}</small>"
 
-            if meta_html == "" or "*** NÃO SEGUIRÁ" in meta_html.upper() or "INATIVO" in meta_html.upper():
+            if meta_html == "" or "*** NÃO SEGUIRÁ" in meta_html.upper() or "INATIVO" in meta_html.upper() or "NÃO SEGUIRÁ" in meta_html.upper():
                 meta_html = "-"
 
-            # --- A REGRA DE OURO ---
+            # Regra de Ouro: Se a meta está zerada ou indisponível, o peso desaparece da tela e do gráfico
             peso_val = "-"
             if meta_html != "-":
-                # Se a meta existe, puxa o peso extraído do arquivo
                 peso_val = pesos_ativos[indicador].get(cluster, "-")
-                
-                # Se o arquivo não tiver a linha "Ponderação" preenchida, usa a contingência oficial
-                if not achou_pesos_no_arquivo and peso_val in ["-", "0%", ""]:
-                    peso_val = pesos_padrao[indicador].get(cluster, "-")
             
-            # Guarda o peso final limpo para o gráfico
-            pesos_finais_grafico[indicador][cluster] = peso_val if peso_val != "-" else "0%"
+            if peso_val == "0%": peso_val = "-"
+            
+            # Alimenta a matriz do gráfico em tempo real com inteiros purificados
+            try: pesos_sincronizados_grafico[indicador][cluster] = int(peso_val.replace("%", "")) if peso_val != "-" else 0
+            except: pesos_sincronizados_grafico[indicador][cluster] = 0
 
-            # Desenha a Célula
             if meta_html == "-":
-                celula_meta = f'<td class="meta-muted-gray">{meta_html}</td>'
+                celula_html = f'<td class="meta-muted-gray">{meta_html}</td>'
             elif "TMA" in indicador:
-                celula_meta = f'<td class="meta-tma-gray">{meta_html}</td>'
+                celula_html = f'<td class="meta-tma-gray">{meta_html}</td>'
             else:
-                celula_meta = f'<td>{meta_html}</td>'
+                celula_html = f'<td>{meta_html}</td>'
                 
-            html_tabela += celula_meta + f'<td>{peso_val}</td>'
+            html_tabela += celula_html + f'<td>{peso_val}</td>'
         html_tabela += '</tr>'
         
     html_tabela += '</tbody></table>'
     
     if idx_inicio == -1:
-        st.warning(f"Sem dados localizados para a competência selecionada no arquivo metas.csv.")
+        st.warning(f"Aguardando sincronização do arquivo metas.csv para o mês selecionado.")
     else:
         st.html(html_tabela)
 
     # ==============================================================================
-    # CALCULADORA MATEMÁTICA E GRÁFICOS (SINCRONIZADOS COM A TELA)
+    # SOMA DE PILARES E EXIBIÇÃO DO GRÁFICO DINÂMICO
     # ==============================================================================
     resumo_dimensoes = {}
-    grafico_pesos = {}
     for cl in clusters_totais:
-        def p2int(v):
-            try: return int(float(v.replace("%", "").replace(",", "."))) if v not in ["-", "", "0%"] else 0
-            except: return 0
-            
-        exp = p2int(pesos_finais_grafico["CSAT"][cl])
-        efi = p2int(pesos_finais_grafico["TMA / TMT"][cl]) + p2int(pesos_finais_grafico["Improcedência Devida"][cl])
-        dis = p2int(pesos_finais_grafico["Nota de Monitoria"][cl]) + p2int(pesos_finais_grafico["Aderência à Escala"][cl]) + p2int(pesos_finais_grafico["Evasão de Pausas"][cl])
-        
-        resumo_dimensoes[cl] = [f"{exp}%", f"{efi}%", f"{dis}%"]
-        grafico_pesos[cl] = [exp, efi, dis]
+        exp = pesos_sincronizados_grafico["CSAT"][cl]
+        efi = pesos_sincronizados_grafico["TMA / TMT"][cl] + pesos_sincronizados_grafico["Improcedência Devida"][cl]
+        dis = pesos_sincronizados_grafico["Nota de Monitoria"][cl] + pesos_sincronizados_grafico["Aderência à Escala"][cl] + pesos_sincronizados_grafico["Evasão de Pausas"][cl]
+        resumo_dimensoes[cl] = [f"{exp}%" if exp > 0 else "-", f"{efi}%" if efi > 0 else "-", f"{dis}%" if dis > 0 else "-"]
 
     if idx_inicio != -1 and len(linhas_bloco) > 0:
         st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
@@ -319,7 +293,7 @@ try:
         for pilar, valores in dados_resumo:
             html_resumo += f'<tr><td style="text-align: left !important; font-weight: bold;">{pilar}</td>'
             for val in valores:
-                if val in ["0%", "-", "0", "0%"]: html_resumo += f'<td class="meta-muted-gray">{val}</td>'
+                if val == "-": html_resumo += f'<td class="meta-muted-gray">{val}</td>'
                 else: html_resumo += f'<td>{val}</td>'
             html_resumo += '</tr>'
         html_resumo += '</tbody></table>'
@@ -327,9 +301,9 @@ try:
         st.divider()
 
         st.subheader("📊 Campo Comparativo: Visão Gráfica da Arquitetura de Pesos")
-        valores_csat = [grafico_pesos.get(c, [0, 0, 0])[0] for c in clusters_filtrados]
-        valores_eficiencia = [grafico_pesos.get(c, [0, 0, 0])[1] for c in clusters_filtrados]
-        valores_disciplina = [grafico_pesos.get(c, [0, 0, 0])[2] for c in clusters_filtrados]
+        valores_csat = [pesos_sincronizados_grafico["CSAT"][c] for c in clusters_filtrados]
+        valores_eficiencia = [pesos_sincronizados_grafico["TMA / TMT"][c] + pesos_sincronizados_grafico["Improcedência Devida"][c] for c in clusters_filtrados]
+        valores_disciplina = [pesos_sincronizados_grafico["Nota de Monitoria"][c] + pesos_sincronizados_grafico["Aderência à Escala"][c] + pesos_sincronizados_grafico["Evasão de Pausas"][c] for c in clusters_filtrados]
 
         fig = go.Figure()
         fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_csat, name='🧠 Experiência', marker_color='#1e3a8a', text=[f"{v}%" if v > 0 else "" for v in valores_csat], textposition='inside', textfont=dict(color='white', weight='bold')))
