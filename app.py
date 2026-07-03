@@ -66,7 +66,42 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- MOTOR DE LEITURA BLINDADO ---
+# --- ARQUITETURA DINÂMICA DE PESOS POR MÊS ---
+mes_procurado = competencia.split(" / ")[0].lower()
+
+# Dicionário mestre que controla os pesos de forma centralizada e reflete na tabela e gráficos
+if "julho" in mes_procurado:
+    pesos_ativos = {
+        "CSAT": {"RE": "35%", "MONO": "35%", "MULTI": "30%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
+        "TMA / TMT": {"RE": "30%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "30%", "CSF AJUDA": "0%", "CSF QUALITY": "30%"},
+        "Improcedência Devida": {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "30%", "CSF QUALITY": "10%"},
+        "Nota de Monitoria": {"RE": "25%", "MONO": "25%", "MULTI": "15%", "CSF INTERNO": "45%", "CSF AJUDA": "50%", "CSF QUALITY": "45%"},
+        "Aderência à Escala": {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "0%"},
+        "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
+    }
+else:
+    # Pesos Históricos (Junho, Maio, etc.) - Você pode editar esses valores aqui e o painel atualizará sozinho!
+    pesos_ativos = {
+        "CSAT": {"RE": "35%", "MONO": "40%", "MULTI": "35%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
+        "TMA / TMT": {"RE": "35%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "35%", "CSF AJUDA": "0%", "CSF QUALITY": "35%"},
+        "Improcedência Devida": {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "25%", "CSF QUALITY": "10%"},
+        "Nota de Monitoria": {"RE": "20%", "MONO": "20%", "MULTI": "10%", "CSF INTERNO": "40%", "CSF AJUDA": "55%", "CSF QUALITY": "40%"},
+        "Aderência à Escala": {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "0%"},
+        "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
+    }
+
+# Calculadora Automática para Gráficos e Resumos baseada no dicionário acima
+resumo_dimensoes = {}
+grafico_pesos = {}
+for cl in clusters_totais:
+    def p2int(v): return int(v.replace("%", "")) if v not in ["-", "", "0%"] else 0
+    exp = p2int(pesos_ativos["CSAT"][cl])
+    efi = p2int(pesos_ativos["TMA / TMT"][cl]) + p2int(pesos_ativos["Improcedência Devida"][cl])
+    dis = p2int(pesos_ativos["Nota de Monitoria"][cl]) + p2int(pesos_ativos["Aderência à Escala"][cl]) + p2int(pesos_ativos["Evasão de Pausas"][cl])
+    resumo_dimensoes[cl] = [f"{exp}%", f"{efi}%", f"{dis}%"]
+    grafico_pesos[cl] = [exp, efi, dis]
+
+# --- REVISÃO DA LEITURA DO CSV ---
 try:
     try:
         df_raw = pd.read_csv("metas.csv", header=None, sep=';')
@@ -74,38 +109,40 @@ try:
     except:
         df_raw = pd.read_csv("metas.csv", header=None, sep=',')
 
-    mes_procurado = competencia.split(" / ")[0].lower()
-    
-    # 1. Isola o bloco do mês selecionado
+    # 1. Captura o bloco bruto do mês de forma agressiva nas colunas A e B
     linhas_bloco = []
     capturando = False
     
     for idx, row in df_raw.iterrows():
         col_a = str(row.iloc[0]).strip().lower() if pd.notna(row.iloc[0]) else ""
-        if mes_procurado in col_a:
+        col_b = str(row.iloc[1]).strip().lower() if len(row) > 1 and pd.notna(row.iloc[1]) else ""
+        txt_verif = col_a + " " + col_b
+        
+        if mes_procurado in txt_verif:
             capturando = True
             continue
-        elif capturando and col_a != "" and any(m in col_a for m in ["julho", "junho", "maio", "abril", "março", "fevereiro", "janeiro", "histórico", "↓"]):
-            capturando = False
-            break
+        elif capturando and (col_a != "" or col_b != ""):
+            if any(m in txt_verif for m in ["julho", "junho", "maio", "abril", "março", "fevereiro", "janeiro", "histórico", "↓"]) and mes_procurado not in txt_verif:
+                capturando = False
+                break
+                
         if capturando:
             linhas_bloco.append(row)
 
-    # 2. RADAR DE COLUNAS: Acha em qual posição cada cluster está na planilha atual
+    # 2. RADAR DE COLUNAS ULTRA-FLEXÍVEL
     map_cols = {}
     for row in linhas_bloco:
         linha_upper = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
-        if "RE" in linha_upper and ("CSF INTERNO" in linha_upper or "CSF QUALITY" in linha_upper):
+        if "RE" in linha_upper or "MONO" in linha_upper or "MULTI" in linha_upper:
             for i, val in enumerate(linha_upper):
                 if val == "RE": map_cols["RE"] = i
                 elif "MONO" in val: map_cols["MONO"] = i
                 elif "MULTI" in val: map_cols["MULTI"] = i
                 elif "CSF INTERNO" in val: map_cols["CSF INTERNO"] = i
                 elif "CSF AJUDA" in val: map_cols["CSF AJUDA"] = i
-                elif "QUALITY" in val: map_cols["CSF QUALITY"] = i
+                elif "QUALITY" in val or "CSF QUALITY" in val: map_cols["CSF QUALITY"] = i
             break
 
-    # Se não encontrar cabeçalho, assume o padrão clássico do Sheets
     if not map_cols:
         map_cols = {"RE": 2, "MONO": 3, "MULTI": 4, "CSF INTERNO": 5, "CSF AJUDA": 6, "CSF QUALITY": 7}
 
@@ -125,10 +162,8 @@ try:
     for row in linhas_bloco:
         col_b = str(row.iloc[1]).strip() if len(row) > 1 and pd.notna(row.iloc[1]) else ""
         if col_b == "": col_b = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ""
-            
         nome_upper = col_b.upper()
         
-        # Ignora linhas sistêmicas
         if "METAS" in nome_upper or "INDICADOR" in nome_upper or "PONDERAÇÃO" in nome_upper or "FAIXAS" in nome_upper:
             continue
             
@@ -144,7 +179,7 @@ try:
         if not current_pAI:
             continue
             
-        # Coleta a meta do cluster baseado na posição correta dele
+        # Coleta a meta do cluster
         for cl, idx_col in map_cols.items():
             val = pegar_val(row, idx_col)
             if val == "-": continue
@@ -159,7 +194,7 @@ try:
                 matriz_final[current_pAI][cl]["base"] = val
 
     # ==============================================================================
-    # QUADRO 1: MATRIZ DE INDICADORES CONSTRUÍDA
+    # QUADRO 1: MATRIZ DE INDICADORES CONSOLIDADA
     # ==============================================================================
     st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
     
@@ -171,14 +206,6 @@ try:
         html_tabela += '<th>Meta</th><th>Peso</th>'
     html_tabela += '</tr></thead><tbody>'
 
-    # Regras de Negócio de Pesos Estratégicos
-    if "julho" in mes_procurado:
-        grafico_pesos = {"RE": [35, 40, 25], "MONO": [35, 40, 25], "MULTI": [30, 40, 30], "CSF INTERNO": [0, 30, 70], "CSF AJUDA": [0, 30, 70], "CSF QUALITY": [0, 40, 60]}
-        resumo_dimensoes = {"RE": ["35%", "40%", "25%"], "MONO": ["35%", "40%", "25%"], "MULTI": ["30%", "40%", "30%"], "CSF INTERNO": ["0%", "30%", "70%"], "CSF AJUDA": ["0%", "30%", "70%"], "CSF QUALITY": ["0%", "40%", "60%"]}
-    else:
-        grafico_pesos = {"RE": [35, 45, 20], "MONO": [40, 40, 20], "MULTI": [35, 40, 25], "CSF INTERNO": [0, 35, 65], "CSF AJUDA": [0, 25, 75], "CSF QUALITY": [0, 45, 55]}
-        resumo_dimensoes = {"RE": ["35%", "45%", "20%"], "MONO": ["40%", "40%", "20%"], "MULTI": ["35%", "40%", "25%"], "CSF INTERNO": ["0%", "35%", "65%"], "CSF AJUDA": ["0%", "25%", "75%"], "CSF QUALITY": ["0%", "45%", "55%"]}
-
     icones = {"CSAT": "💻 ", "TMA / TMT": "⏱️ ", "Improcedência Devida": "🚫 ", "Nota de Monitoria": "🎧 ", "Aderência à Escala": "📅 ", "Evasão de Pausas": "🛑 "}
 
     for indicador in oficiais:
@@ -187,7 +214,7 @@ try:
         for cluster in clusters_filtrados:
             dados_celula = matriz_final[indicador][cluster]
             
-            # Concatenação visual elegante (Base, Fone/Digital, Q1)
+            # Concatenação inteligente da Meta
             meta_html = ""
             if dados_celula["fone"] != "-" or dados_celula["dig"] != "-":
                 f_str = f"Fone: {dados_celula['fone']}" if dados_celula["fone"] != "-" else ""
@@ -203,19 +230,13 @@ try:
                 else:
                     meta_html += f"<br><small class='meta-muted-gray'>Q1: {dados_celula['q1']}</small>"
 
-            if meta_html == "" or "*** NÃO SEGUIRÁ" in meta_html.upper():
+            if meta_html == "" or "*** NÃO SEGUIRÁ" in meta_html.upper() or "INATIVO" in meta_html.upper():
                 meta_html = "-"
             
-            # Pesos Estáticos Corporativos
-            peso_val = "-"
-            if "CSAT" in indicador: peso_val = "35%" if cluster in ["RE", "MONO"] else ("30%" if cluster == "MULTI" else "0%")
-            elif "TMA" in indicador: peso_val = "30%" if cluster != "CSF AJUDA" else "0%"
-            elif "IMPROCEDÊNCIA" in indicador.upper(): peso_val = "10%" if cluster != "CSF AJUDA" else "30%"
-            elif "MONITORIA" in indicador.upper(): peso_val = "25%" if cluster in ["RE", "MONO"] else ("15%" if cluster == "MULTI" else ("45%" if cluster in ["CSF INTERNO", "CSF QUALITY"] else "50%"))
-            elif "ADERÊNCIA" in indicador.upper(): peso_val = "15%" if cluster == "MULTI" else ("25%" if cluster == "CSF INTERNO" else ("20%" if cluster == "CSF AJUDA" else "0%"))
-            elif "EVASÃO" in indicador.upper(): peso_val = "15%" if cluster == "CSF QUALITY" else "0%"
+            # Busca o peso DIRETAMENTE do dicionário mestre, garantindo a alteração no filtro
+            peso_val = pesos_ativos[indicador].get(cluster, "-")
+            if peso_val == "0%": peso_val = "-"
 
-            # Aplicação de cores
             if meta_html == "-":
                 celula_meta = f'<td class="meta-muted-gray">{meta_html}</td>'
             elif "TMA" in indicador:
@@ -230,7 +251,7 @@ try:
     st.html(html_tabela)
 
     # ==============================================================================
-    # QUADRO 2: RESUMO INVERTIDO SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA
+    # QUADRO 2 E GRÁFICOS (ALIMENTADOS PELO MOTOR AUTOMÁTICO)
     # ==============================================================================
     st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
     html_resumo = '<table class="table-executiva"><thead><tr><th>Dimensão Estratégica / Pilar</th>'
@@ -253,9 +274,6 @@ try:
     st.html(html_resumo)
     st.divider()
 
-    # ==============================================================================
-    # GRÁFICO COMPARATIVO EM BARRAS EMPILHADAS
-    # ==============================================================================
     st.subheader("📊 Campo Comparativo: Visão Gráfica da Arquitetura de Pesos")
     valores_csat = [grafico_pesos.get(c, [0, 0, 0])[0] for c in clusters_filtrados]
     valores_eficiencia = [grafico_pesos.get(c, [0, 0, 0])[1] for c in clusters_filtrados]
