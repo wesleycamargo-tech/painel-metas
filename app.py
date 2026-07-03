@@ -67,7 +67,7 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- DICIONÁRIOS DE PESOS (PLANO B) ---
+# --- DICIONÁRIOS DE PESOS (PLANO B OFICIAL) ---
 mes_procurado = competencia.split(" / ")[0].lower()
 
 pesos_padrao = {}
@@ -98,7 +98,7 @@ try:
     except:
         df_raw = pd.read_csv("metas.csv", header=None, sep=',')
 
-    # 1. ISOLAMENTO PERFEITO DO BLOCO DO MÊS
+    # 1. ISOLAMENTO DO BLOCO DO MÊS
     idx_inicio = -1
     idx_fim = len(df_raw)
     
@@ -117,24 +117,32 @@ try:
                 
     linhas_bloco = df_raw.iloc[idx_inicio:idx_fim] if idx_inicio != -1 else pd.DataFrame()
 
-    # 2. RADAR GLOBAL DE COLUNAS
+    # 2. RADAR GLOBAL DE COLUNAS (SCANNER MULTILINHAS ANTI-ERRO)
     map_cols = {}
     for idx, row in linhas_bloco.iterrows():
-        row_str = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
-        if "RE" in row_str and any(c in row_str for c in ["MONO", "MULTI", "INTERNO", "QUALITY"]):
-            for i, val in enumerate(row_str):
-                if val == "RE": map_cols["RE"] = i
-                elif "MONO" in val: map_cols["MONO"] = i
-                elif "MULTI" in val: map_cols["MULTI"] = i
-                elif "INTERNO" in val: map_cols["CSF INTERNO"] = i
-                elif "AJUDA" in val: map_cols["CSF AJUDA"] = i
-                elif "QUALITY" in val: map_cols["CSF QUALITY"] = i
+        row_str = " ".join([str(x).upper() for x in row if pd.notna(x)])
+        
+        # Interrompe o scan assim que chegar nos dados reais das metas
+        if "CSAT" in row_str or "SATISFAÇÃO" in row_str:
             break
+            
+        for i, val_raw in enumerate(row):
+            val = str(val_raw).upper().strip()
+            if not val: continue
+            
+            # Adiciona ao mapa apenas a primeira vez que encontrar (evita duplicações falsas)
+            if (val == "RE" or val == "R.E") and "RE" not in map_cols: map_cols["RE"] = i
+            elif "MONO" in val and "MONO" not in map_cols: map_cols["MONO"] = i
+            elif "MULTI" in val and "MULTI" not in map_cols: map_cols["MULTI"] = i
+            elif "INTERNO" in val and "CSF INTERNO" not in map_cols: map_cols["CSF INTERNO"] = i
+            elif "AJUDA" in val and "CSF AJUDA" not in map_cols: map_cols["CSF AJUDA"] = i
+            elif "QUALITY" in val and "CSF QUALITY" not in map_cols: map_cols["CSF QUALITY"] = i
 
-    if not map_cols:
+    # Se a planilha for completamente bizarra e não tiver cabeçalho, usa um fallback de segurança
+    if len(map_cols) < 2:
         map_cols = {"RE": 2, "MONO": 3, "MULTI": 4, "CSF INTERNO": 5, "CSF AJUDA": 6, "CSF QUALITY": 7}
 
-    # 3. EXTRAÇÃO DINÂMICA DE PESOS (Com Plano de Contingência)
+    # 3. EXTRAÇÃO DINÂMICA DE PESOS (Com Plano B acoplado ao Radar)
     oficiais = ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]
     pesos_ativos = {ind: {cl: "-" for cl in clusters_totais} for ind in oficiais}
     achou_pesos_no_arquivo = False
@@ -167,20 +175,28 @@ try:
                                 if v.endswith(".0"): v = v[:-2]
                                 pesos_ativos[ind][cl] = v + "%"
                                 break
-            break # Já achou e processou os pesos
 
-    # Se não achou NENHUMA linha de pesos no arquivo para este mês, injeta o padrão (Resolve Abril)
-    if not achou_pesos_no_arquivo:
-        pesos_ativos = pesos_padrao
+    # Se não achou pesos no CSV, preenche com o padrão histórico para não zerar os gráficos
+    for ind in oficiais:
+        for cl in clusters_totais:
+            if pesos_ativos[ind][cl] == "-" or pesos_ativos[ind][cl] == "0%":
+                pesos_ativos[ind][cl] = pesos_padrao[ind].get(cl, "-")
 
-    # 4. EXTRATOR MESTRE DE METAS (Lê A e B juntas para não perder Maio)
+    # 4. EXTRATOR MESTRE DE METAS (Com base no Radar Global)
     matriz_final = {ind: {cl: {"base": "-", "fone": "-", "dig": "-", "q1": "-"} for cl in clusters_totais} for ind in oficiais}
     current_pAI = None
     
+    def pegar_val(r, cl):
+        idx_col = map_cols.get(cl, -1)
+        if idx_col != -1 and len(r) > idx_col and pd.notna(r.iloc[idx_col]):
+            v = str(r.iloc[idx_col]).strip()
+            return "-" if v.lower() in ["nan", "", "sem meta"] else v
+        return "-"
+
     for idx, row in linhas_bloco.iterrows():
         c0 = str(row.iloc[0]).upper().strip() if pd.notna(row.iloc[0]) else ""
         c1 = str(row.iloc[1]).upper().strip() if len(row) > 1 and pd.notna(row.iloc[1]) else ""
-        nome_linha = f"{c0} {c1}" # A mágica que resolve as metas em branco
+        nome_linha = f"{c0} {c1}"
         
         if "METAS" in nome_linha or "PONDERAÇÃO" in nome_linha or "FAIXAS" in nome_linha or "INDICADOR" in nome_linha:
             continue
@@ -188,7 +204,7 @@ try:
         is_parent = False
         if ("CSAT" in nome_linha or "SATISFAÇÃO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "CSAT"; is_parent = True
         elif ("TMA" in nome_linha or "TMT" in nome_linha or "TEMPO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "TMA / TMT"; is_parent = True
-        elif "IMPROCEDÊNCIA" in nome_linha and "Q1" not in nome_linha: current_pAI = "Improcedência Devida"; is_parent = True
+        elif ("IMPROCEDÊNCIA" in nome_linha or "IMPROCEDENCIA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Improcedência Devida"; is_parent = True
         elif ("MONITORIA" in nome_linha or "QUALIDADE" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Nota de Monitoria"; is_parent = True
         elif ("ADERÊNCIA" in nome_linha or "ESCALA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Aderência à Escala"; is_parent = True
         elif ("EVASÃO" in nome_linha or "PAUSAS" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Evasão de Pausas"; is_parent = True
@@ -196,9 +212,8 @@ try:
         if not current_pAI:
             continue
             
-        for cl, i_col in map_cols.items():
-            val = str(row.iloc[i_col]).strip() if len(row) > i_col and pd.notna(row.iloc[i_col]) else "-"
-            if val.lower() in ["nan", "", "sem meta"]: val = "-"
+        for cl in clusters_totais:
+            val = pegar_val(row, cl)
             if val == "-": continue
             
             if "Q1" in nome_linha: matriz_final[current_pAI][cl]["q1"] = val
