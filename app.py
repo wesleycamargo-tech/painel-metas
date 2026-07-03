@@ -64,12 +64,12 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- LEITURA DIRETA COMPACTA ---
+# --- LEITURA DIRETA E SEGURA ---
 try:
     df_raw = pd.read_csv("metas.csv", header=None)
     mes_procurado = "julho" if "Julho" in competencia else "junho"
     
-    # Localiza o índice inicial da seção do mês
+    # 1. Busca flexível pela linha do mês
     idx_inicio = None
     for idx, row in df_raw.iterrows():
         txt = str(row.iloc[0]).strip().lower()
@@ -78,38 +78,45 @@ try:
             break
 
     if idx_inicio is None:
-        st.error(f"Não localizamos a seção contendo '{mes_procurado}' no arquivo metas.csv.")
+        st.error(f"Não localizamos o marcador '{mes_procurado}' na primeira coluna do arquivo metas.csv.")
+        st.info("Linhas disponíveis na primeira coluna para diagnóstico:")
+        st.write(df_raw.iloc[:, 0].dropna().head(20).tolist())
     else:
-        # Coleta as linhas pertencentes a este mês limpando ruídos vazios
+        # 2. Captura sequencial direta sem filtros agressivos
         linhas_validas = []
         for i in range(idx_inicio + 1, len(df_raw)):
             row = df_raw.iloc[i]
             val_primeiro = str(row.iloc[0]).strip()
             
-            # Condição de parada ao encontrar outro marcador de mês
-            if i > (idx_inicio + 2) and ("2026" in val_primeiro or "↓" in val_primeiro or "HISTÓRICO" in val_primeiro.upper() or ("junho" in val_primeiro.lower() and mes_procurado == "julho") or ("julho" in val_primeiro.lower() and mes_procurado == "junho")):
+            # Condição de parada flexível ao alcançar outro mês ou seção histórica
+            if i > (idx_inicio + 2) and (
+                ("junho" in val_primeiro.lower() and mes_procurado == "julho") or 
+                ("julho" in val_primeiro.lower() and mes_procurado == "junho") or 
+                ("maio" in val_primeiro.lower()) or
+                ("↓" in val_primeiro) or 
+                ("HISTÓRICO" in val_primeiro.upper())
+            ):
                 break
                 
-            # Ignora linhas nulas ou de formatação de títulos internos
-            if val_primeiro == "nan" or val_primeiro == "" or "METAS" in val_primeiro.upper() or "PONDERAÇÃO" in val_primeiro.upper() or "FAIXAS" in val_primeiro.upper():
+            # Remove linhas puramente em branco
+            if val_primeiro == "nan" or val_primeiro == "":
                 continue
                 
             linhas_validas.append(row)
 
         if len(linhas_validas) == 0:
-            st.error("Dados estruturais não foram encontrados nesse bloco. Verifique o metas.csv.")
+            st.error(f"O bloco contendo '{mes_procurado}' foi achado na linha {idx_inicio}, mas nenhuma linha de dados válida estava logo abaixo dele.")
         else:
-            # Reconstrói a sub-tabela ignorando colunas em branco extras da planilha
+            # 3. Monta o DataFrame
             df_mes = pd.DataFrame(linhas_validas)
-            df_mes = df_mes.dropna(how='all', axis=1) # Limpa colunas fantasmas à direita
+            df_mes = df_mes.dropna(how='all', axis=1) # Remove colunas fantasmas à direita
             
-            # Mapeia as colunas diretamente baseado nas posições reais padrão
+            # Define o padrão de colunas corporativas padrão fixas
             colunas_completas = ["INDICADOR", "RE", "CSF INTERNO", "CSF AJUDA", "CSF QUALITY"]
+            qtd_cols_reais = df_mes.shape[1]
             
-            # Garante que o número de colunas coincida com o tamanho real dos dados limpos
-            qtd_cols = min(len(colunas_completas), df_mes.shape[1])
-            df_mes = df_mes.iloc[:, :qtd_cols]
-            df_mes.columns = colunas_completas[:qtd_cols]
+            # Ajusta dinamicamente os nomes das colunas baseado nas colunas que o CSV gerou
+            df_mes.columns = [colunas_completas[i] if i < len(colunas_completas) else f"COL_{i}" for i in range(qtd_cols_reais)]
 
             # ==============================================================================
             # QUADRO 1: MATRIZ DE INDICADORES
@@ -124,7 +131,6 @@ try:
                 html_tabela += '<th>Meta</th><th>Peso</th>'
             html_tabela += '</tr></thead><tbody>'
 
-            # Definição estática de pesos corporativos
             if "julho" in mes_procurado:
                 grafico_pesos = {"RE": [35, 40, 25], "CSF INTERNO": [0, 30, 70], "CSF AJUDA": [0, 30, 70], "CSF QUALITY": [0, 40, 60]}
                 resumo_dimensoes = {"RE": ["35%", "40%", "25%"], "CSF INTERNO": ["0%", "30%", "70%"], "CSF AJUDA": ["0%", "30%", "70%"], "CSF QUALITY": ["0%", "40%", "60%"]}
@@ -137,6 +143,10 @@ try:
             for _, row in df_mes.iterrows():
                 indicador_nome = str(row.iloc[0]).strip()
                 indicador_upper = indicador_nome.upper()
+                
+                # Pula linhas de títulos estruturais remanescentes
+                if "METAS -" in indicador_upper or "PONDERAÇÃO" in indicador_upper or "FAIXAS" in indicador_upper:
+                    continue
                 
                 icone = "🔹 "
                 for k, v in icones.items():
