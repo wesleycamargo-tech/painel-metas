@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Estilização Executiva Premium + Correção de Espaço no Topo
+# Estilização Executiva Premium
 st.markdown("""
     <style>
     .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; }
@@ -25,16 +25,15 @@ st.markdown("""
     .table-executiva { width: 100%; border-collapse: collapse; font-family: sans-serif; font-size: 14px; margin-bottom: 20px; background-color: white; border-radius: 4px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
     .table-executiva th { background-color: #f1f5f9; color: #1e293b; font-weight: 600; padding: 10px; border: 1px solid #e2e8f0; text-align: center !important; }
     .table-executiva td { padding: 12px 10px; border: 1px solid #e2e8f0; text-align: center !important; color: #0f172a !important; }
-    .meta-muted-gray { color: #94a3b8 !important; font-weight: normal !important; }
+    .meta-muted-gray { color: #94a3b8 !important; font-weight: normal !important; font-size: 12px; }
     .meta-tma-gray { color: #64748b !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- SIDEBAR: Filtros Estratégicos Corporativos ---
+# --- SIDEBAR ---
 st.sidebar.markdown("## 📊 Filtros Corporativos")
 st.sidebar.markdown("---")
 
-# Menu de Competências expandido para buscar todo o histórico vertical do CSV
 competencia = st.sidebar.selectbox(
     "Selecione a Competência:", 
     ["Julho / 2026", "Junho / 2026", "Maio / 2026", "Abril / 2026", "Março / 2026", "Fevereiro / 2026", "Janeiro / 2026"]
@@ -47,7 +46,7 @@ filtro_macro = st.sidebar.radio(
     ["Ver Todas as Clusters", "CRC (MONO + MULTI)", "RE", "CSF (Interno, Ajuda, Quality)"]
 )
 
-# Regra de filtragem de colunas mapeada dinamicamente
+# Mapeamento dos clusters ativos na visualização
 clusters_totais = ["RE", "MONO", "MULTI", "CSF INTERNO", "CSF AJUDA", "CSF QUALITY"]
 if filtro_macro == "CRC (MONO + MULTI)":
     clusters_filtrados = ["MONO", "MULTI"]
@@ -68,9 +67,7 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# ==============================================================================
-# ENGINE DE CAPTURA VISUAL E TRATAMENTO DA ARQUITETURA DE DADOS (MÊS A MÊS VIVA)
-# ==============================================================================
+# --- PROCESSAMENTO 100% DINÂMICO DO CSV ---
 try:
     try:
         df_raw = pd.read_csv("metas.csv", header=None, sep=';')
@@ -78,54 +75,68 @@ try:
     except:
         df_raw = pd.read_csv("metas.csv", header=None, sep=',')
 
-    # Mapeia o termo do filtro lateral para buscar a quebra de linha exata no CSV
-    mes_procurado = competencia.split(" / ")[0].lower() + " " + competencia.split(" / ")[1]
+    mes_procurado = competencia.split(" / ")[0].lower()
     
-    idx_inicio = None
+    # 1. Isola e varre o arquivo identificando em qual bloco de linhas o mês está posicionado
+    linhas_mes = []
+    capturando = False
+    
     for idx, row in df_raw.iterrows():
-        txt = str(row.iloc[0]).strip().lower()
-        if mes_procurado in txt:
-            idx_inicio = idx
+        col_a = str(row.iloc[0]).strip().lower() if pd.notna(row.iloc[0]) else ""
+        col_b = str(row.iloc[1]).strip() if pd.notna(row.iloc[1]) else ""
+        
+        if mes_procurado in col_a:
+            capturando = True
+            continue
+        elif capturando and col_a != "" and any(m in col_a for m in ["julho", "junho", "maio", "abril", "março", "fevereiro", "janeiro", "histórico", "↓"]):
+            capturando = False
             break
+            
+        if capturando and col_b != "" and col_b != "nan":
+            linhas_mes.append(row)
 
-    # Criação de um fallback de dados caso um mês histórico específico no CSV esteja sem preenchimento completo
-    # Garantindo que o painel nunca fique em branco ou quebre na frente da diretoria
-    dados_carregados = {}
+    # 2. Consolidação inteligente: Agrupa sublinhas (Fone, Digital, Q1) sob o indicador pai
+    indicadores_consolidados = {}
     
-    if "Julho" in competencia:
-        dados_carregados = {
-            "CSAT": {"RE": "84.0%<br><small class='meta-muted-gray'>Q1: 91%</small>", "MONO": "Fone: 88% / Dig: 80%", "MULTI": "Fone: 90% / Dig: 80%", "CSF INTERNO": "Inativo", "CSF AJUDA": "Inativo", "CSF QUALITY": "Inativo"},
-            "TMA / TMT": {"RE": "Conforme dim.", "MONO": "Conforme dim.", "MULTI": "Conforme dim.", "CSF INTERNO": "Conforme dim.", "CSF AJUDA": "-", "CSF QUALITY": "Conforme dim."},
-            "Improcedência Devida": {"RE": "≤ 2 Abs<br><small class='meta-muted-gray'>Q1: <= 1</small>", "MONO": "≤ 2 Abs", "MULTI": "≤ 2 Abs", "CSF INTERNO": "-", "CSF AJUDA": "1 Abs<br><small class='meta-muted-gray'>Q1: 0 'zero'</small>", "CSF QUALITY": "1 Abs<br><small class='meta-muted-gray'>Q1: 0 'zero'</small>"},
-            "Nota de Monitoria": {"RE": "90%<br><small class='meta-muted-gray'>Q1: 95%</small>", "MONO": "90%", "MULTI": "90%", "CSF INTERNO": "75%<br><small class='meta-muted-gray'>Q1: 83%</small>", "CSF AJUDA": "75%<br><small class='meta-muted-gray'>Q1: 83%</small>", "CSF QUALITY": "75%<br><small class='meta-muted-gray'>Q1: 83%</small>"},
-            "Aderência à Escala": {"RE": "-", "MONO": "-", "MULTI": "88%<br><small class='meta-muted-gray'>Q1: 93.5%</small>", "CSF INTERNO": "88%<br><small class='meta-muted-gray'>Q1: 93.5%</small>", "CSF AJUDA": "88%<br><small class='meta-muted-gray'>Q1: 93.5%</small>", "CSF QUALITY": "-"},
-            "Evasão de Pausas": {"RE": "6 a 10 Abs<br><small class='meta-muted-gray'>Q1: até 5 Abs</small>", "MONO": "≤ 5 Abs", "MULTI": "-", "CSF INTERNO": "-", "CSF AJUDA": "-", "CSF QUALITY": "15%<br><small class='meta-muted-gray'>Q1: até 5 Abs</small>"}
-        }
-        grafico_pesos = {"RE": [35, 40, 25], "MONO": [35, 40, 25], "MULTI": [30, 40, 30], "CSF INTERNO": [0, 30, 70], "CSF AJUDA": [0, 30, 70], "CSF QUALITY": [0, 40, 60]}
-        resumo_dimensoes = {"RE": ["35%", "40%", "25%"], "MONO": ["35%", "40%", "25%"], "MULTI": ["30%", "40%", "30%"], "CSF INTERNO": ["0%", "30%", "70%"], "CSF AJUDA": ["0%", "30%", "70%"], "CSF QUALITY": ["0%", "40%", "60%"]}
-    else:
-        # Padrão estável para Junho e meses do Histórico
-        dados_carregados = {
-            "CSAT": {"RE": "86.5%", "MONO": "Fone: 87% / Dig: 80%", "MULTI": "Fone: 88% / Dig: 80%", "CSF INTERNO": "Inativo", "CSF AJUDA": "Inativo", "CSF QUALITY": "Inativo"},
-            "TMA / TMT": {"RE": "Conforme dim.", "MONO": "Conforme dim.", "MULTI": "Conforme dim.", "CSF INTERNO": "Conforme dim.", "CSF AJUDA": "-", "CSF QUALITY": "Conforme dim."},
-            "Improcedência Devida": {"RE": "≤ 2 Abs", "MONO": "≤ 2 Abs", "MULTI": "≤ 2 Abs", "CSF INTERNO": "-", "CSF AJUDA": "1 Abs", "CSF QUALITY": "1 Abs"},
-            "Nota de Monitoria": {"RE": "90%", "MONO": "90%", "MULTI": "90%", "CSF INTERNO": "88%", "CSF AJUDA": "80%", "CSF QUALITY": "80%"},
-            "Aderência à Escala": {"RE": "-", "MONO": "-", "MULTI": "88%", "CSF INTERNO": "88%", "CSF AJUDA": "88%", "CSF QUALITY": "-"},
-            "Evasão de Pausas": {"RE": "6 a 10 Abs", "MONO": "≤ 5 Abs", "MULTI": "-", "CSF INTERNO": "-", "CSF AJUDA": "-", "CSF QUALITY": "15%"}
-        }
-        grafico_pesos = {"RE": [35, 45, 20], "MONO": [40, 40, 20], "MULTI": [35, 40, 25], "CSF INTERNO": [0, 35, 65], "CSF AJUDA": [0, 25, 75], "CSF QUALITY": [0, 45, 55]}
-        resumo_dimensoes = {"RE": ["35%", "45%", "20%"], "MONO": ["40%", "40%", "20%"], "MULTI": ["35%", "40%", "25%"], "CSF INTERNO": ["0%", "35%", "65%"], "CSF AJUDA": ["0%", "25%", "75%"], "CSF QUALITY": ["0%", "45%", "55%"]}
+    for row in linhas_mes:
+        nome_bruto = str(row.iloc[1]).strip()
+        nome_upper = nome_bruto.upper()
+        
+        if "METAS" in nome_upper or "PONDERAÇÃO" in nome_upper or "FAIXAS" in nome_upper or "INDICADOR" in nome_upper:
+            continue
+            
+        # Define a qual indicador principal essa sublinha pertence
+        pAI = "CSAT" if "CSAT" in nome_upper else (
+              "TMA / TMT" if "TMA" in nome_upper or "TMT" in nome_upper else (
+              "Improcedência Devida" if "IMPROCEDÊNCIA" in nome_upper else (
+              "Nota de Monitoria" if "MONITORIA" in nome_upper else (
+              "Aderência à Escala" if "ADERÊNCIA" in nome_upper or "ESCALA" in nome_upper else (
+              "Evasão de Pausas" if "EVASÃO" in nome_upper or "PAUSAS" in nome_upper else nome_bruto)))))
 
-    # --- SINCRO DINÂMICA: Tenta injetar os dados extras do CSV caso existam novas linhas digitadas
-    if idx_inicio is not None:
-        for i in range(idx_inicio + 1, min(idx_inicio + 20, len(df_raw))):
-            row = df_raw.iloc[i]
-            val_b = str(row.iloc[1]).strip() if len(row) > 1 else ""
-            if "junho" in val_b.lower() or "julho" in val_b.lower() or "histórico" in val_b.lower(): break
-            # Injeção dinâmica customizada pode ser expandida aqui se necessário
+        if pAI not in indicadores_consolidados:
+            indicadores_consolidados[pAI] = {"RE": "", "MONO": "", "MULTI": "", "CSF INTERNO": "", "CSF AJUDA": "", "CSF QUALITY": ""}
+            
+        # Posições das colunas: C=2 (RE), D=3 (MONO), E=4 (MULTI), F=5 (CSF INT), G=6 (CSF AJU), H=7 (CSF QUA)
+        map_idx = {"RE": 2, "MONO": 3, "MULTI": 4, "CSF INTERNO": 5, "CSF AJUDA": 6, "CSF QUALITY": 7}
+        
+        for cl, col_pos in map_idx.items():
+            val = str(row.iloc[col_pos]).strip() if len(row) > col_pos and pd.notna(row.iloc[col_pos]) else "-"
+            if val == "nan" or val == "": val = "-"
+            
+            # Se for linha de detalhamento (Fone, Digital, Q1), concatena na célula de forma organizada
+            if "Q1" in nome_upper:
+                if val != "-": indicadores_consolidados[pAI][cl] += f"<br><small class='meta-muted-gray'>Q1: {val}</small>"
+            elif "FONE" in nome_upper:
+                if val != "-": indicadores_consolidados[pAI][cl] += f"Fone: {val}"
+            elif "DIGITAL" in nome_upper or "DIG" in nome_upper:
+                if val != "-":
+                    prefixo = " / " if "Fone:" in indicadores_consolidados[pAI][cl] else ""
+                    indicadores_consolidados[pAI][cl] += f"{prefixo}Dig: {val}"
+            else:
+                if val != "-": indicadores_consolidados[pAI][cl] = val
 
     # ==============================================================================
-    # QUADRO 1: MATRIZ DE INDICADORES (UMA LINHA POR INDICADOR - FONE/DIGITAL FUSÃO)
+    # QUADRO 1: MATRIZ DINÂMICA COMPLETA DO CSV
     # ==============================================================================
     st.markdown('<div class="macro-title">📋 MATRIZ INTEGRADA: METAS E PESOS POR CLUSTER</div>', unsafe_allow_html=True)
     
@@ -139,13 +150,23 @@ try:
 
     icones = {"CSAT": "💻 ", "TMA / TMT": "⏱️ ", "Improcedência Devida": "🚫 ", "Nota de Monitoria": "🎧 ", "Aderência à Escala": "📅 ", "Evasão de Pausas": "🛑 "}
 
-    for indicador, valores in dados_carregados.items():
-        html_tabela += f'<tr><td style="text-align: left !important; padding-left: 15px;"><b>{icones[indicador]}{indicador}</b></td>'
+    # Definição matemática de Pesos Fixos das Dimensões para os Pilares do Mês
+    if "julho" in mes_procurado:
+        grafico_pesos = {"RE": [35, 40, 25], "MONO": [35, 40, 25], "MULTI": [30, 40, 30], "CSF INTERNO": [0, 30, 70], "CSF AJUDA": [0, 30, 70], "CSF QUALITY": [0, 40, 60]}
+        resumo_dimensoes = {"RE": ["35%", "40%", "25%"], "MONO": ["35%", "40%", "25%"], "MULTI": ["30%", "40%", "30%"], "CSF INTERNO": ["0%", "30%", "70%"], "CSF AJUDA": ["0%", "30%", "70%"], "CSF QUALITY": ["0%", "40%", "60%"]}
+    else:
+        grafico_pesos = {"RE": [35, 45, 20], "MONO": [40, 40, 20], "MULTI": [35, 40, 25], "CSF INTERNO": [0, 35, 65], "CSF AJUDA": [0, 25, 75], "CSF QUALITY": [0, 45, 55]}
+        resumo_dimensoes = {"RE": ["35%", "45%", "20%"], "MONO": ["40%", "40%", "20%"], "MULTI": ["35%", "40%", "25%"], "CSF INTERNO": ["0%", "35%", "65%"], "CSF AJUDA": ["0%", "25%", "75%"], "CSF QUALITY": ["0%", "45%", "55%"]}
+
+    for indicador, valores in indicadores_consolidados.items():
+        icone = icones.get(indicador, "🔹 ")
+        html_tabela += f'<tr><td style="text-align: left !important; padding-left: 15px;"><b>{icone}{indicador}</b></td>'
         
         for cluster in clusters_filtrados:
-            meta_val = valores.get(cluster, "-")
+            meta_val = valores.get(cluster, "").strip()
+            if meta_val == "": meta_val = "-"
             
-            # Atribuição regulamentar e fixa de pesos por indicador para estabilidade do Q1/Q2
+            # Cálculo e posicionamento das fatias de peso corporativo
             peso_val = "-"
             if "CSAT" in indicador: peso_val = "35%" if cluster in ["RE", "MONO"] else ("30%" if cluster == "MULTI" else "0%")
             elif "TMA" in indicador: peso_val = "30%" if cluster != "CSF AJUDA" else "0%"
@@ -154,8 +175,7 @@ try:
             elif "ADERÊNCIA" in indicador.upper(): peso_val = "15%" if cluster == "MULTI" else ("25%" if cluster == "CSF INTERNO" else ("20%" if cluster == "CSF AJUDA" else "0%"))
             elif "EVASÃO" in indicador.upper(): peso_val = "15%" if cluster == "CSF QUALITY" else "0%"
 
-            if meta_val in ["-", "Inativo", "nan"] or meta_val == "":
-                meta_val = "-"
+            if meta_val == "-":
                 celula_meta = f'<td class="meta-muted-gray">{meta_val}</td>'
             elif "TMA" in indicador:
                 celula_meta = f'<td class="meta-tma-gray">{meta_val}</td>'
@@ -169,7 +189,7 @@ try:
     st.html(html_tabela)
 
     # ==============================================================================
-    # QUADRO 2: RESUMO INVERTIDO (SOMA DOS PILARES ESTRATÉGICOS)
+    # QUADRO 2: RESUMO INVERTIDO SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA
     # ==============================================================================
     st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
     html_resumo = '<table class="table-executiva"><thead><tr><th>Dimensão Estratégica / Pilar</th>'
@@ -193,7 +213,7 @@ try:
     st.divider()
 
     # ==============================================================================
-    # GRÁFICO COMPARATIVO EXECUTIVO PREMIUM
+    # GRÁFICO COMPARATIVO EM BARRAS EMPILHADAS
     # ==============================================================================
     st.subheader("📊 Campo Comparativo: Visão Gráfica da Arquitetura de Pesos")
     valores_csat = [grafico_pesos.get(c, [0, 0, 0])[0] for c in clusters_filtrados]
@@ -208,4 +228,4 @@ try:
     st.plotly_chart(fig, use_container_width=True)
 
 except Exception as e:
-    st.error(f"Erro de sincronização vertical com o metas.csv: {e}")
+    st.error(f"Erro de processamento no arquivo metas.csv: {e}")
