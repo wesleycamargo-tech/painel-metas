@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import io
 
 # Configuração da página Lumia / Streamlit
 st.set_page_config(
@@ -64,19 +65,22 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- LEITURA INTELIGENTE DO CSV ---
+# --- LEITURA INTELIGENTE COM CORREÇÃO DE QUEBRA DE LINHA ---
 try:
-    # Testa primeiro se o CSV usa ponto e vírgula (;), se falhar usa vírgula (,)
+    # 1. Abre o arquivo como texto bruto e normaliza todas as quebras de linha estranhas (\r e \r\n) para \n
+    with open("metas.csv", "r", encoding="utf-8", errors="ignore") as f:
+        conteudo_limpo = f.read().replace('\r\n', '\n').replace('\r', '\n')
+    
+    # 2. Converte de volta para uma tabela usando o motor dinâmico do Pandas (detectando separador ; ou ,)
     try:
-        df_raw = pd.read_csv("metas.csv", header=None, sep=';')
-        if df_raw.shape[1] <= 1:
-            raise ValueError
+        df_raw = pd.read_csv(io.StringIO(conteudo_limpo), header=None, sep=';')
+        if df_raw.shape[1] <= 1: raise ValueError
     except:
-        df_raw = pd.read_csv("metas.csv", header=None, sep=',')
+        df_raw = pd.read_csv(io.StringIO(conteudo_limpo), header=None, sep=',')
 
     mes_procurado = "julho" if "Julho" in competencia else "junho"
     
-    # 1. Localiza a linha inicial do mês
+    # 3. Localiza a linha inicial do mês selecionado
     idx_inicio = None
     for idx, row in df_raw.iterrows():
         txt = str(row.iloc[0]).strip().lower()
@@ -87,13 +91,13 @@ try:
     if idx_inicio is None:
         st.error(f"Não localizamos o marcador '{mes_procurado}' na primeira coluna do arquivo metas.csv.")
     else:
-        # 2. Captura sequencial das linhas de dados abaixo do cabeçalho do mês
+        # 4. Varre verticalmente e captura o bloco de dados do mês
         linhas_validas = []
         for i in range(idx_inicio + 1, len(df_raw)):
             row = df_raw.iloc[i]
             val_primeiro = str(row.iloc[0]).strip()
             
-            # Condição de parada flexível ao alcançar outra seção ou fim de bloco
+            # Condição de parada: se achar outro mês abaixo ou fim de histórico, interrompe
             if i > (idx_inicio + 2) and (
                 ("junho" in val_primeiro.lower() and mes_procurado == "julho") or 
                 ("julho" in val_primeiro.lower() and mes_procurado == "junho") or 
@@ -103,20 +107,18 @@ try:
             ):
                 break
                 
-            # Remove linhas puramente nulas ou vazias
             if val_primeiro == "nan" or val_primeiro == "":
                 continue
                 
             linhas_validas.append(row)
 
         if len(linhas_validas) == 0:
-            st.error(f"O bloco '{mes_procurado}' foi achado na linha {idx_inicio}, mas as linhas seguintes vieram vazias ou sem estrutura tratável.")
+            st.error(f"O bloco '{mes_procurado}' foi achado na linha {idx_inicio}, mas a formatação interna impede a leitura.")
         else:
-            # 3. Formatação do DataFrame recortado
+            # 5. Formatação do mini DataFrame recortado
             df_mes = pd.DataFrame(linhas_validas)
-            df_mes = df_mes.dropna(how='all', axis=1) # Limpa colunas fantasmas à direita
+            df_mes = df_mes.dropna(how='all', axis=1)
             
-            # Define estaticamente o cabeçalho correto para parear com a estrutura da planilha
             colunas_completas = ["INDICADOR", "RE", "CSF INTERNO", "CSF AJUDA", "CSF QUALITY"]
             qtd_cols_reais = df_mes.shape[1]
             
@@ -148,7 +150,6 @@ try:
                 indicador_nome = str(row.iloc[0]).strip()
                 indicador_upper = indicador_nome.upper()
                 
-                # Ignora cabeçalhos de texto repetidos que possam ter vindo do arquivo original
                 if "METAS -" in indicador_upper or "PONDERAÇÃO" in indicador_upper or "FAIXAS" in indicador_upper or "CSF INTERNO" in indicador_upper or "INDICADOR" in indicador_upper:
                     continue
                 
