@@ -85,7 +85,6 @@ if "julho" in mes_nome and "2026" in ano_nome:
         "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
     }
 else:
-    # Histórico: Quality 15% na Aderência / 0% Evasão
     pesos_padrao = {
         "CSAT": {"RE": "35%", "MONO": "40%", "MULTI": "35%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
         "TMA / TMT": {"RE": "35%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "35%", "CSF AJUDA": "0%", "CSF QUALITY": "35%"},
@@ -124,30 +123,35 @@ try:
                 
     linhas_bloco = df_raw.iloc[idx_inicio:idx_fim] if idx_inicio != -1 else pd.DataFrame()
 
-    # 2. RADAR OPERACIONAL DE CABEÇALHOS (Equivalência CAR -> RE)
+    # 2. RADAR OPERACIONAL DE CABEÇALHOS (Scanner Profundo sem freio)
     map_cols = {}
     for idx in range(max(0, idx_inicio - 1), min(len(df_raw), idx_fim)):
         row = df_raw.iloc[idx]
         row_str = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
-        if any(c in row_str for c in ["RE", "CAR", "C.A.R.", "CSF", "MONO", "INTERNO"]):
-            for i, val in enumerate(row_str):
-                if val in ["RE", "R.E", "R.E.", "CAR", "C.A.R.", "C.A.R"]: map_cols["RE"] = i
-                elif "MONO" in val or "CRC MONO" in val: map_cols["MONO"] = i
-                elif "MULTI" in val or "CRC MULTI" in val: map_cols["MULTI"] = i
-                elif "INTERNO" in val or "CSF INTERNO" in val: map_cols["CSF INTERNO"] = i
-                elif "AJUDA" in val or "CSF AJUDA" in val: map_cols["CSF AJUDA"] = i
-                elif "QUALITY" in val or "CSF QUALITY" in val: map_cols["CSF QUALITY"] = i
-                elif "CSF" in val: map_cols["CSF_GENERICO"] = i
-            
-            if "CSF_GENERICO" in map_cols:
-                if "CSF INTERNO" not in map_cols: map_cols["CSF INTERNO"] = map_cols["CSF_GENERICO"]
-                if "CSF QUALITY" not in map_cols: map_cols["CSF QUALITY"] = map_cols["CSF_GENERICO"]
+        
+        # O Radar para de procurar colunas na hora que bate nos dados reais
+        if any(c in " ".join(row_str) for c in ["CSAT", "SATISFAÇÃO", "TMA", "IMPROCEDÊNCIA", "METAS"]):
             break
+            
+        for i, val in enumerate(row_str):
+            if not val: continue
+            if val in ["RE", "R.E", "R.E.", "CAR", "C.A.R.", "C.A.R"]: map_cols["RE"] = i
+            elif "MONO" in val or "CRC MONO" in val: map_cols["MONO"] = i
+            elif "MULTI" in val or "CRC MULTI" in val: map_cols["MULTI"] = i
+            elif "INTERNO" in val or "CSF INTERNO" in val: map_cols["CSF INTERNO"] = i
+            elif "AJUDA" in val or "CSF AJUDA" in val: map_cols["CSF AJUDA"] = i
+            elif "QUALITY" in val or "CSF QUALITY" in val: map_cols["CSF QUALITY"] = i
+            elif "CSF" in val and "CSF_GENERICO" not in map_cols: map_cols["CSF_GENERICO"] = i
+            
+    # Tratamento Histórico: Clona a coluna unificada CSF para Interno e Quality se não tiverem sido achados
+    if "CSF_GENERICO" in map_cols:
+        if "CSF INTERNO" not in map_cols: map_cols["CSF INTERNO"] = map_cols["CSF_GENERICO"]
+        if "CSF QUALITY" not in map_cols: map_cols["CSF QUALITY"] = map_cols["CSF_GENERICO"]
 
     if not map_cols:
         map_cols = {"RE": 2, "MONO": 3, "MULTI": 4, "CSF INTERNO": 5, "CSF AJUDA": 6, "CSF QUALITY": 7}
 
-    # 3. EXTRAÇÃO DE PESOS E TRAVA HISTÓRICA
+    # 3. EXTRAÇÃO DE PESOS DA COMPETÊNCIA
     oficiais = ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]
     pesos_ativos = {ind: {cl: "-" for cl in clusters_totais} for ind in oficiais}
     achou_pesos_no_arquivo = False
@@ -180,7 +184,10 @@ try:
                                 break
             break
 
-    # Anula pesos do CSF AJUDA antes de Junho/2026 e acopla o Plano B
+    # Garante o acoplamento do Plano B e mata o CSF Ajuda no passado
+    if not achou_pesos_no_arquivo:
+        pesos_ativos = pesos_padrao
+
     for ind in oficiais:
         for cl in clusters_totais:
             if cl == "CSF AJUDA":
@@ -188,10 +195,10 @@ try:
                     pesos_ativos[ind][cl] = "-"
                     continue
                     
-            if not achou_pesos_no_arquivo or pesos_ativos[ind][cl] == "-" or pesos_ativos[ind][cl] == "0%" or pesos_ativos[ind][cl] == "":
+            if pesos_ativos[ind][cl] == "-" or pesos_ativos[ind][cl] == "0%" or pesos_ativos[ind][cl] == "":
                 pesos_ativos[ind][cl] = pesos_padrao[ind].get(cl, "-")
 
-    # 4. EXTRATOR MESTRE DE METAS (Com Efeito Magnético para linhas órfãs)
+    # 4. EXTRATOR MESTRE DE METAS (Com Efeito Magnético)
     matriz_final = {ind: {cl: {"base": "-", "fone": "-", "dig": "-", "q1": "-"} for cl in clusters_totais} for ind in oficiais}
     current_pAI = None
     
@@ -208,12 +215,13 @@ try:
         if "METAS" in nome_linha or "PONDERAÇÃO" in nome_linha or "FAIXAS" in nome_linha or "INDICADOR" in nome_linha:
             continue
             
-        if ("CSAT" in nome_linha or "SATISFAÇÃO" in nome_linha or "SATISFACAO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "CSAT"
-        elif ("TMA" in nome_linha or "TMT" in nome_linha or "TEMPO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "TMA / TMT"
-        elif ("IMPROCEDÊNCIA" in nome_linha or "IMPROCEDENCIA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Improcedência Devida"
-        elif ("MONITORIA" in nome_linha or "QUALIDADE" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Nota de Monitoria"
-        elif ("ADERÊNCIA" in nome_linha or "ADERENCIA" in nome_linha or "ESCALA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Aderência à Escala"
-        elif ("EVASÃO" in nome_linha or "EVASAO" in nome_linha or "PAUSAS" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Evasão de Pausas"
+        is_parent = False
+        if ("CSAT" in nome_linha or "SATISFAÇÃO" in nome_linha or "SATISFACAO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "CSAT"; is_parent = True
+        elif ("TMA" in nome_linha or "TMT" in nome_linha or "TEMPO" in nome_linha) and "Q1" not in nome_linha: current_pAI = "TMA / TMT"; is_parent = True
+        elif ("IMPROCEDÊNCIA" in nome_linha or "IMPROCEDENCIA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Improcedência Devida"; is_parent = True
+        elif ("MONITORIA" in nome_linha or "QUALIDADE" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Nota de Monitoria"; is_parent = True
+        elif ("ADERÊNCIA" in nome_linha or "ADERENCIA" in nome_linha or "ESCALA" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Aderência à Escala"; is_parent = True
+        elif ("EVASÃO" in nome_linha or "EVASAO" in nome_linha or "PAUSAS" in nome_linha) and "Q1" not in nome_linha: current_pAI = "Evasão de Pausas"; is_parent = True
         
         if not current_pAI:
             continue
@@ -234,7 +242,6 @@ try:
             elif "DIGITAL" in nome_linha or "DIG" in nome_linha: 
                 matriz_final[current_pAI][cl]["dig"] = val
             else:
-                # O Segredo Magnético: Captura a meta órfã da linha de baixo que ficou sem nome por causa de mesclagem
                 if matriz_final[current_pAI][cl]["base"] == "-": 
                     matriz_final[current_pAI][cl]["base"] = val
 
