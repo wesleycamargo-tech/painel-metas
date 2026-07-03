@@ -113,11 +113,10 @@ try:
             if len(map_cols) >= 4:
                 break
 
-    # Caso falte alguma coluna no mapeamento, força a ordem oficial descrita por você
     if len(map_cols) < 4:
         map_cols = {"RE": 2, "CSF INTERNO": 3, "CSF AJUDA": 4, "CSF QUALITY": 5, "MONO": 6, "MULTI": 7}
 
-    # 2. LOCALIZADOR FLEXÍVEL DE BLOCOS DE MESES (Fusão Multicolunas A-B-C)
+    # 2. LOCALIZADOR FLEXÍVEL DE BLOCOS DE MESES (CORRIGIDO PARA EVITAR O ERRO DE SERIES)
     idx_inicio = -1
     idx_fim = len(df_raw)
     
@@ -129,7 +128,8 @@ try:
             
     if idx_inicio != -1:
         for idx in range(idx_inicio + 1, len(df_raw)):
-            txt_linha = " ".join([str(x).strip().lower() for x in df_raw.iloc[idx, 0:4] if pd.notna(df_raw.iloc[idx, 0:4])])
+            # CORREÇÃO APLICADA AQUI -> Usando `x` no pd.notna(x) ao invés do iloc completo
+            txt_linha = " ".join([str(x).strip().lower() for x in df_raw.iloc[idx, 0:4] if pd.notna(x)])
             meses_stop = ["janeiro", "fevereiro", "março", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "histórico", "↓"]
             if any(m in txt_linha for m in meses_stop) and mes_procurado not in txt_linha:
                 idx_fim = idx
@@ -178,7 +178,6 @@ try:
     if not carregar_pesos_da_lista(bloco_list):
         carregar_pesos_da_lista(raw_list)
 
-    # Força a contingência de pesos vazios
     for ind in oficiais:
         for cl in clusters_totais:
             if pesos_ativos[ind][cl] == "-" or pesos_ativos[ind][cl] == "0%" or pesos_ativos[ind][cl] == "":
