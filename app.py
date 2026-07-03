@@ -77,7 +77,7 @@ try:
 
     mes_procurado = competencia.split(" / ")[0].lower()
     
-    # 1. RADAR GLOBAL DE COLUNAS (Evita qualquer erro de deslocamento de dados)
+    # 1. RADAR GLOBAL DE COLUNAS
     map_cols = {}
     for idx, row in df_raw.iterrows():
         linha_upper = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
@@ -118,7 +118,7 @@ try:
                 
             linhas_bloco.append(row)
 
-    # 3. EXTRATOR DINÂMICO DE PESOS (Lê a linha de Ponderação direto do CSV)
+    # 3. EXTRATOR DINÂMICO DE PESOS CORRIGIDO
     oficiais = ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]
     pesos_ativos = {ind: {cl: "-" for cl in clusters_totais} for ind in oficiais}
     
@@ -133,8 +133,11 @@ try:
     
     def extrair_pesos(fonte_linhas):
         encontrou = False
-        for _, r in fonte_linhas.iterrows() if isinstance(fonte_linhas, pd.DataFrame) else enumerate(fonte_linhas):
-            row_data = r[1] if isinstance(fonte_linhas, list) else r
+        # Correção do iterador para evitar o erro de 'float object not iterable'
+        iterador = [r for _, r in fonte_linhas.iterrows()] if isinstance(fonte_linhas, pd.DataFrame) else fonte_linhas
+        
+        for row_data in iterador:
+            # Pega todos os valores da linha em formato de string
             row_str = " ".join([str(x).upper() for x in row_data if pd.notna(x)])
             
             if "PONDERAÇÃO" in row_str or "PESOS" in row_str or "PESO" in row_str:
@@ -154,7 +157,6 @@ try:
                 break
         return encontrou
 
-    # Tenta extrair do mês; se não achar, extrai da planilha global
     if not extrair_pesos(linhas_bloco):
         extrair_pesos(df_raw)
 
@@ -164,7 +166,7 @@ try:
             return "-" if v.lower() in ["nan", "", "sem meta"] else v
         return "-"
 
-    # 4. CONSOLIDAÇÃO INTELIGENTE DE METAS (Fone, Digital, Q1)
+    # 4. CONSOLIDAÇÃO DE METAS (Fone, Digital, Q1)
     matriz_final = {ind: {cl: {"base": "-", "fone": "-", "dig": "-", "q1": "-"} for cl in clusters_totais} for ind in oficiais}
     current_pAI = None
     
@@ -217,7 +219,6 @@ try:
         for cluster in clusters_filtrados:
             dados_celula = matriz_final[indicador][cluster]
             
-            # Formatação HTML limpa e alinhada
             meta_html = ""
             if dados_celula["fone"] != "-" or dados_celula["dig"] != "-":
                 f_str = f"Fone: {dados_celula['fone']}" if dados_celula["fone"] != "-" else ""
@@ -252,7 +253,7 @@ try:
     html_tabela += '</tbody></table>'
     
     if len(linhas_bloco) == 0:
-        st.warning(f"Sem dados localizados para o mês de {mes_procurado.capitalize()}.")
+        st.warning(f"Sem dados localizados para a competência selecionada.")
     else:
         st.html(html_tabela)
 
