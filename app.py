@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import re
 
 # Configuração da página Lumia / Streamlit
 st.set_page_config(
@@ -66,30 +67,7 @@ st.markdown("""
 st.caption(f"Visão Dinâmica de Metas, Pesos e Dimensões Estratégicas • **Competência Vigente: {competencia}**")
 st.divider()
 
-# --- ARQUITETURA DINÂMICA DE PESOS POR MÊS ---
-mes_procurado = competencia.split(" / ")[0].lower()
-
-# O painel agora usa EXCLUSIVAMENTE este dicionário para desenhar a tabela e os gráficos
-if "julho" in mes_procurado:
-    pesos_ativos = {
-        "CSAT": {"RE": "35%", "MONO": "35%", "MULTI": "30%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
-        "TMA / TMT": {"RE": "30%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "30%", "CSF AJUDA": "0%", "CSF QUALITY": "30%"},
-        "Improcedência Devida": {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "30%", "CSF QUALITY": "10%"},
-        "Nota de Monitoria": {"RE": "25%", "MONO": "25%", "MULTI": "15%", "CSF INTERNO": "45%", "CSF AJUDA": "50%", "CSF QUALITY": "45%"},
-        "Aderência à Escala": {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "0%"},
-        "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
-    }
-else:
-    pesos_ativos = {
-        "CSAT": {"RE": "35%", "MONO": "40%", "MULTI": "35%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "0%"},
-        "TMA / TMT": {"RE": "35%", "MONO": "30%", "MULTI": "30%", "CSF INTERNO": "35%", "CSF AJUDA": "0%", "CSF QUALITY": "35%"},
-        "Improcedência Devida": {"RE": "10%", "MONO": "10%", "MULTI": "10%", "CSF INTERNO": "0%", "CSF AJUDA": "25%", "CSF QUALITY": "10%"},
-        "Nota de Monitoria": {"RE": "20%", "MONO": "20%", "MULTI": "10%", "CSF INTERNO": "40%", "CSF AJUDA": "55%", "CSF QUALITY": "40%"},
-        "Aderência à Escala": {"RE": "0%", "MONO": "0%", "MULTI": "15%", "CSF INTERNO": "25%", "CSF AJUDA": "20%", "CSF QUALITY": "0%"},
-        "Evasão de Pausas": {"RE": "0%", "MONO": "0%", "MULTI": "0%", "CSF INTERNO": "0%", "CSF AJUDA": "0%", "CSF QUALITY": "15%"}
-    }
-
-# --- LEITURA E PROCESSAMENTO DO CSV ---
+# --- LEITURA E PROCESSAMENTO INTELIGENTE DO CSV ---
 try:
     try:
         df_raw = pd.read_csv("metas.csv", header=None, sep=';')
@@ -97,28 +75,11 @@ try:
     except:
         df_raw = pd.read_csv("metas.csv", header=None, sep=',')
 
-    linhas_bloco = []
-    capturando = False
+    mes_procurado = competencia.split(" / ")[0].lower()
     
-    for idx, row in df_raw.iterrows():
-        col_a = str(row.iloc[0]).strip().lower() if pd.notna(row.iloc[0]) else ""
-        col_b = str(row.iloc[1]).strip().lower() if len(row) > 1 and pd.notna(row.iloc[1]) else ""
-        txt_verif = col_a + " " + col_b
-        
-        if mes_procurado in txt_verif:
-            capturando = True
-            continue
-        elif capturando and (col_a != "" or col_b != ""):
-            if any(m in txt_verif for m in ["julho", "junho", "maio", "abril", "março", "fevereiro", "janeiro", "histórico", "↓"]) and mes_procurado not in txt_verif:
-                capturando = False
-                break
-                
-        if capturando:
-            linhas_bloco.append(row)
-
-    # NOVO MAPA DE COLUNAS: Lendo a posição real baseada na sua imagem
+    # 1. RADAR GLOBAL DE COLUNAS (Evita qualquer erro de deslocamento de dados)
     map_cols = {}
-    for row in linhas_bloco:
+    for idx, row in df_raw.iterrows():
         linha_upper = [str(x).upper().strip() if pd.notna(x) else "" for x in row]
         if "RE" in linha_upper and ("CSF INTERNO" in linha_upper or "CSF QUALITY" in linha_upper):
             for i, val in enumerate(linha_upper):
@@ -130,9 +91,72 @@ try:
                 elif "QUALITY" in val or "CSF QUALITY" in val: map_cols["CSF QUALITY"] = i
             break
 
-    # Se a leitura falhar, usa a ordem exata da sua nova planilha como fallback
-    if len(map_cols) < 2:
-        map_cols = {"RE": 2, "CSF INTERNO": 3, "CSF AJUDA": 4, "CSF QUALITY": 5, "MONO": 6, "MULTI": 7}
+    if not map_cols:
+        map_cols = {"RE": 2, "MONO": 3, "MULTI": 4, "CSF INTERNO": 5, "CSF AJUDA": 6, "CSF QUALITY": 7}
+
+    # 2. CAPTURA DO BLOCO DO MÊS
+    linhas_bloco = []
+    capturando = False
+    
+    for idx, row in df_raw.iterrows():
+        col_a = str(row.iloc[0]).strip().lower() if pd.notna(row.iloc[0]) else ""
+        col_b = str(row.iloc[1]).strip().lower() if len(row) > 1 and pd.notna(row.iloc[1]) else ""
+        txt_verif = col_a + " " + col_b
+        
+        if mes_procurado in txt_verif:
+            capturando = True
+            continue
+            
+        if capturando:
+            meses_stop = ["julho", "junho", "maio", "abril", "março", "fevereiro", "janeiro"]
+            if any(m in txt_verif for m in meses_stop) and mes_procurado not in txt_verif:
+                capturando = False
+                break
+            if "↓" in txt_verif or "histórico" in txt_verif:
+                capturando = False
+                break
+                
+            linhas_bloco.append(row)
+
+    # 3. EXTRATOR DINÂMICO DE PESOS (Lê a linha de Ponderação direto do CSV)
+    oficiais = ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]
+    pesos_ativos = {ind: {cl: "-" for cl in clusters_totais} for ind in oficiais}
+    
+    map_terms = {
+        "CSAT": ["CSAT", "SATISFAÇÃO"],
+        "TMA / TMT": ["TMA", "TMT", "TEMPO"],
+        "Improcedência Devida": ["IMPROCEDÊNCIA"],
+        "Nota de Monitoria": ["MONITORIA", "NOTA"],
+        "Aderência à Escala": ["ADERÊNCIA", "ESCALA"],
+        "Evasão de Pausas": ["EVASÃO", "PAUSAS"]
+    }
+    
+    def extrair_pesos(fonte_linhas):
+        encontrou = False
+        for _, r in fonte_linhas.iterrows() if isinstance(fonte_linhas, pd.DataFrame) else enumerate(fonte_linhas):
+            row_data = r[1] if isinstance(fonte_linhas, list) else r
+            row_str = " ".join([str(x).upper() for x in row_data if pd.notna(x)])
+            
+            if "PONDERAÇÃO" in row_str or "PESOS" in row_str or "PESO" in row_str:
+                encontrou = True
+                for cl, idx in map_cols.items():
+                    if len(row_data) > idx and pd.notna(row_data.iloc[idx]):
+                        cell_text = str(row_data.iloc[idx]).upper()
+                        for ind, terms in map_terms.items():
+                            for term in terms:
+                                pattern = re.escape(term) + r'.{0,35}?(\d+(?:[.,]\d+)?)\s*%'
+                                match = re.search(pattern, cell_text)
+                                if match:
+                                    v = match.group(1).replace(",", ".")
+                                    if v.endswith(".0"): v = v[:-2]
+                                    pesos_ativos[ind][cl] = v + "%"
+                                    break
+                break
+        return encontrou
+
+    # Tenta extrair do mês; se não achar, extrai da planilha global
+    if not extrair_pesos(linhas_bloco):
+        extrair_pesos(df_raw)
 
     def pegar_val(r, idx_col):
         if len(r) > idx_col and pd.notna(r.iloc[idx_col]):
@@ -140,10 +164,8 @@ try:
             return "-" if v.lower() in ["nan", "", "sem meta"] else v
         return "-"
 
-    # Dicionário de Indicadores Oficiais
-    oficiais = ["CSAT", "TMA / TMT", "Improcedência Devida", "Nota de Monitoria", "Aderência à Escala", "Evasão de Pausas"]
+    # 4. CONSOLIDAÇÃO INTELIGENTE DE METAS (Fone, Digital, Q1)
     matriz_final = {ind: {cl: {"base": "-", "fone": "-", "dig": "-", "q1": "-"} for cl in clusters_totais} for ind in oficiais}
-
     current_pAI = None
     
     for row in linhas_bloco:
@@ -155,17 +177,16 @@ try:
             continue
             
         is_parent = False
-        if "CSAT" in nome_upper and "Q1" not in nome_upper: current_pAI = "CSAT"; is_parent = True
-        elif ("TMA" in nome_upper or "TMT" in nome_upper) and "Q1" not in nome_upper: current_pAI = "TMA / TMT"; is_parent = True
+        if ("CSAT" in nome_upper or "SATISFAÇÃO" in nome_upper) and "Q1" not in nome_upper: current_pAI = "CSAT"; is_parent = True
+        elif ("TMA" in nome_upper or "TMT" in nome_upper or "TEMPO" in nome_upper) and "Q1" not in nome_upper: current_pAI = "TMA / TMT"; is_parent = True
         elif "IMPROCEDÊNCIA" in nome_upper and "Q1" not in nome_upper: current_pAI = "Improcedência Devida"; is_parent = True
-        elif "MONITORIA" in nome_upper and "Q1" not in nome_upper: current_pAI = "Nota de Monitoria"; is_parent = True
+        elif ("MONITORIA" in nome_upper or "QUALIDADE" in nome_upper) and "Q1" not in nome_upper: current_pAI = "Nota de Monitoria"; is_parent = True
         elif ("ADERÊNCIA" in nome_upper or "ESCALA" in nome_upper) and "Q1" not in nome_upper: current_pAI = "Aderência à Escala"; is_parent = True
         elif ("EVASÃO" in nome_upper or "PAUSAS" in nome_upper) and "Q1" not in nome_upper: current_pAI = "Evasão de Pausas"; is_parent = True
         
         if not current_pAI:
             continue
             
-        # Puxa o dado alinhado com a posição certa da coluna
         for cl, idx_col in map_cols.items():
             val = pegar_val(row, idx_col)
             if val == "-": continue
@@ -196,7 +217,7 @@ try:
         for cluster in clusters_filtrados:
             dados_celula = matriz_final[indicador][cluster]
             
-            # Formatação elegante de metas (Tudo na mesma célula)
+            # Formatação HTML limpa e alinhada
             meta_html = ""
             if dados_celula["fone"] != "-" or dados_celula["dig"] != "-":
                 f_str = f"Fone: {dados_celula['fone']}" if dados_celula["fone"] != "-" else ""
@@ -215,11 +236,9 @@ try:
             if meta_html == "" or "*** NÃO SEGUIRÁ" in meta_html.upper() or "INATIVO" in meta_html.upper():
                 meta_html = "-"
             
-            # --- CORREÇÃO AQUI: PUXANDO O PESO DIRETAMENTE DO DICIONÁRIO DO MÊS ---
             peso_val = pesos_ativos[indicador].get(cluster, "-")
             if peso_val == "0%": peso_val = "-"
 
-            # Aplicação visual
             if meta_html == "-":
                 celula_meta = f'<td class="meta-muted-gray">{meta_html}</td>'
             elif "TMA" in indicador:
@@ -231,56 +250,62 @@ try:
         html_tabela += '</tr>'
         
     html_tabela += '</tbody></table>'
-    st.html(html_tabela)
+    
+    if len(linhas_bloco) == 0:
+        st.warning(f"Sem dados localizados para o mês de {mes_procurado.capitalize()}.")
+    else:
+        st.html(html_tabela)
 
     # ==============================================================================
-    # PREPARAÇÃO MATEMÁTICA PARA RESUMO E GRÁFICO
+    # PREPARAÇÃO MATEMÁTICA E GRÁFICOS
     # ==============================================================================
     resumo_dimensoes = {}
     grafico_pesos = {}
     for cl in clusters_totais:
-        def p2int(v): return int(v.replace("%", "")) if v not in ["-", "", "0%"] else 0
+        def p2int(v):
+            try: return int(float(v.replace("%", "").replace(",", "."))) if v not in ["-", "", "0%"] else 0
+            except: return 0
+            
         exp = p2int(pesos_ativos["CSAT"][cl])
         efi = p2int(pesos_ativos["TMA / TMT"][cl]) + p2int(pesos_ativos["Improcedência Devida"][cl])
         dis = p2int(pesos_ativos["Nota de Monitoria"][cl]) + p2int(pesos_ativos["Aderência à Escala"][cl]) + p2int(pesos_ativos["Evasão de Pausas"][cl])
+        
         resumo_dimensoes[cl] = [f"{exp}%", f"{efi}%", f"{dis}%"]
         grafico_pesos[cl] = [exp, efi, dis]
 
-    # ==============================================================================
-    # QUADRO 2 E GRÁFICOS
-    # ==============================================================================
-    st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
-    html_resumo = '<table class="table-executiva"><thead><tr><th>Dimensão Estratégica / Pilar</th>'
-    for cluster in clusters_filtrados:
-        html_resumo += f'<th>{cluster}</th>'
-    html_resumo += '</tr></thead><tbody>'
+    if len(linhas_bloco) > 0:
+        st.markdown('<div class="macro-title">⚖️ RESUMO: SOMA DOS PESOS POR DIMENSÃO ESTRATÉGICA</div>', unsafe_allow_html=True)
+        html_resumo = '<table class="table-executiva"><thead><tr><th>Dimensão Estratégica / Pilar</th>'
+        for cluster in clusters_filtrados:
+            html_resumo += f'<th>{cluster}</th>'
+        html_resumo += '</tr></thead><tbody>'
 
-    dados_resumo = [
-        ("🧠 Experiência do Cliente", [resumo_dimensoes.get(c, ["-"])[0] for c in clusters_filtrados]),
-        ("⚡ Eficiência Operacional (TMA + Improc.)", [resumo_dimensoes.get(c, ["-"])[1] for c in clusters_filtrados]),
-        ("📋 Disciplina e Qualidade (Monit. + Escala + Pausas)", [resumo_dimensoes.get(c, ["-"])[2] for c in clusters_filtrados])
-    ]
-    for pilar, valores in dados_resumo:
-        html_resumo += f'<tr><td style="text-align: left !important; font-weight: bold;">{pilar}</td>'
-        for val in valores:
-            if val in ["0%", "-", "0", "0%"]: html_resumo += f'<td class="meta-muted-gray">{val}</td>'
-            else: html_resumo += f'<td>{val}</td>'
-        html_resumo += '</tr>'
-    html_resumo += '</tbody></table>'
-    st.html(html_resumo)
-    st.divider()
+        dados_resumo = [
+            ("🧠 Experiência do Cliente", [resumo_dimensoes.get(c, ["-"])[0] for c in clusters_filtrados]),
+            ("⚡ Eficiência Operacional (TMA + Improc.)", [resumo_dimensoes.get(c, ["-"])[1] for c in clusters_filtrados]),
+            ("📋 Disciplina e Qualidade (Monit. + Escala + Pausas)", [resumo_dimensoes.get(c, ["-"])[2] for c in clusters_filtrados])
+        ]
+        for pilar, valores in dados_resumo:
+            html_resumo += f'<tr><td style="text-align: left !important; font-weight: bold;">{pilar}</td>'
+            for val in valores:
+                if val in ["0%", "-", "0", "0%"]: html_resumo += f'<td class="meta-muted-gray">{val}</td>'
+                else: html_resumo += f'<td>{val}</td>'
+            html_resumo += '</tr>'
+        html_resumo += '</tbody></table>'
+        st.html(html_resumo)
+        st.divider()
 
-    st.subheader("📊 Campo Comparativo: Visão Gráfica da Arquitetura de Pesos")
-    valores_csat = [grafico_pesos.get(c, [0, 0, 0])[0] for c in clusters_filtrados]
-    valores_eficiencia = [grafico_pesos.get(c, [0, 0, 0])[1] for c in clusters_filtrados]
-    valores_disciplina = [grafico_pesos.get(c, [0, 0, 0])[2] for c in clusters_filtrados]
+        st.subheader("📊 Campo Comparativo: Visão Gráfica da Arquitetura de Pesos")
+        valores_csat = [grafico_pesos.get(c, [0, 0, 0])[0] for c in clusters_filtrados]
+        valores_eficiencia = [grafico_pesos.get(c, [0, 0, 0])[1] for c in clusters_filtrados]
+        valores_disciplina = [grafico_pesos.get(c, [0, 0, 0])[2] for c in clusters_filtrados]
 
-    fig = go.Figure()
-    fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_csat, name='🧠 Experiência', marker_color='#1e3a8a', text=[f"{v}%" if v > 0 else "" for v in valores_csat], textposition='inside', textfont=dict(color='white', weight='bold')))
-    fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_eficiencia, name='⚡ Eficiência', marker_color='#475569', text=[f"{v}%" if v > 0 else "" for v in valores_eficiencia], textposition='inside', textfont=dict(color='white', weight='bold')))
-    fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_disciplina, name='📋 Disciplina e Qualidade', marker_color='#0f766e', text=[f"{v}%" if v > 0 else "" for v in valores_disciplina], textposition='inside', textfont=dict(color='white', weight='bold')))
-    fig.update_layout(barmode='stack', plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=400, margin=dict(l=20, r=20, t=10, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5), yaxis=dict(title="Distribuição de Peso (%)", gridcolor="#e2e8f0"))
-    st.plotly_chart(fig, use_container_width=True)
+        fig = go.Figure()
+        fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_csat, name='🧠 Experiência', marker_color='#1e3a8a', text=[f"{v}%" if v > 0 else "" for v in valores_csat], textposition='inside', textfont=dict(color='white', weight='bold')))
+        fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_eficiencia, name='⚡ Eficiência', marker_color='#475569', text=[f"{v}%" if v > 0 else "" for v in valores_eficiencia], textposition='inside', textfont=dict(color='white', weight='bold')))
+        fig.add_trace(go.Bar(x=clusters_filtrados, y=valores_disciplina, name='📋 Disciplina e Qualidade', marker_color='#0f766e', text=[f"{v}%" if v > 0 else "" for v in valores_disciplina], textposition='inside', textfont=dict(color='white', weight='bold')))
+        fig.update_layout(barmode='stack', plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', height=400, margin=dict(l=20, r=20, t=10, b=10), legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5), yaxis=dict(title="Distribuição de Peso (%)", gridcolor="#e2e8f0"))
+        st.plotly_chart(fig, use_container_width=True)
 
 except Exception as e:
     st.error(f"Erro de processamento no arquivo metas.csv: {e}")
